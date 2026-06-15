@@ -11,6 +11,8 @@ import { deleteAvatarsForUser } from "@/lib/avatar";
 const trustedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "https://talerooms.com",
+  "https://www.talerooms.com",
   "https://*.trycloudflare.com",
   ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",")
     .map((o) => o.trim())
