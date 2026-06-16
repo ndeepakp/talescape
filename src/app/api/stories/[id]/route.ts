@@ -9,6 +9,7 @@ import {
   normalizeOfferedDurations,
   normalizePrices,
 } from "@/lib/pricing";
+import { COVER_PUBLIC_PREFIX } from "@/lib/cover";
 import { notify } from "@/lib/notify";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,6 +46,7 @@ export const PUT = withErrors(async (
     offeredDurations,
     wholePrices,
     currency,
+    coverUrl,
     decision,
     inspiredById,
   } = await req.json().catch(() => ({}));
@@ -54,6 +56,10 @@ export const PUT = withErrors(async (
   const offered = normalizeOfferedDurations(offeredDurations);
   const wholePriceMap = normalizePrices(wholePrices, offered);
   const storyCurrency = isCurrency(currency) ? currency : DEFAULT_CURRENCY;
+  const cover =
+    typeof coverUrl === "string" && coverUrl.startsWith(COVER_PUBLIC_PREFIX)
+      ? coverUrl
+      : null;
 
   const invalid = validateStory(
     String(title ?? ""),
@@ -99,6 +105,7 @@ export const PUT = withErrors(async (
         offered_durations = ${offered},
         whole_prices = ${sql.json(wholePriceMap)},
         currency = ${storyCurrency},
+        cover_url = ${cover},
         draft_expires_at = ${isDraft ? sql`now() + interval '7 days'` : null},
         embedding = ${vec ? sql`${vec}::vector` : null}
     WHERE id = ${id}

@@ -38,6 +38,7 @@ type EditStory = {
   offeredDurations: Tier[];
   wholePrices: PriceMap;
   currency: string;
+  coverUrl: string | null;
 };
 
 // Local chapter shape: a stable id (so reordering keeps each editor's content
@@ -94,6 +95,27 @@ export function StoryForm({
   );
   const [wholePrices, setWholePrices] = useState<PriceMap>(story?.wholePrices ?? {});
   const [currency, setCurrency] = useState<string>(story?.currency ?? DEFAULT_CURRENCY);
+  const [coverUrl, setCoverUrl] = useState<string | null>(story?.coverUrl ?? null);
+  const [coverUploading, setCoverUploading] = useState(false);
+
+  async function onCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file later
+    if (!file) return;
+    setError(null);
+    setCoverUploading(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/uploads/cover", { method: "POST", body: fd });
+    setCoverUploading(false);
+    if (res.ok) {
+      const data = await res.json();
+      setCoverUrl(data.url as string);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError(data.error ?? "Could not upload the cover image.");
+    }
+  }
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<null | "draft" | "publish">(null);
@@ -231,6 +253,7 @@ export function StoryForm({
         offeredDurations: offered,
         wholePrices: chaptersPublic || !offerWhole ? {} : wholePrices,
         currency,
+        coverUrl,
         status: draft ? "draft" : "published",
         decision: opts.decision,
         inspiredById: opts.inspiredById,
@@ -372,6 +395,52 @@ export function StoryForm({
               className="h-11 rounded-lg border border-zinc-300 bg-white px-3 text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
             />
           </label>
+
+          {/* Optional cover image */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              Cover image <span className="font-normal text-zinc-400">(optional)</span>
+            </span>
+            <div className="flex items-center gap-4">
+              {coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={coverUrl}
+                  alt="Story cover"
+                  className="h-28 w-20 rounded-md border border-zinc-200 object-cover dark:border-zinc-700"
+                />
+              ) : (
+                <div className="flex h-28 w-20 items-center justify-center rounded-md border border-dashed border-zinc-300 text-2xl text-zinc-300 dark:border-zinc-700">
+                  📖
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5">
+                <label className="cursor-pointer rounded-full border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900">
+                  {coverUploading
+                    ? "Uploading…"
+                    : coverUrl
+                      ? "Replace cover"
+                      : "Upload cover"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={onCoverChange}
+                    disabled={coverUploading}
+                    className="hidden"
+                  />
+                </label>
+                {coverUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setCoverUrl(null)}
+                    className="text-left text-xs text-zinc-400 hover:text-red-600 dark:hover:text-red-400"
+                  >
+                    Remove cover
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* 2. Summary (public tagline) */}
           <label className="flex flex-col gap-1.5">

@@ -26,6 +26,7 @@ type Story = {
   offered_durations: Tier[];
   whole_prices: Partial<Record<Tier, number>>;
   currency: string;
+  cover_url: string | null;
   created_at: string;
   author: string | null;
   author_id: string;
@@ -66,6 +67,7 @@ export default async function StoryPage({
       s.offered_durations,
       s.whole_prices,
       s.currency,
+      s.cover_url,
       s.created_at,
       u.name AS author,
       u.id AS author_id,
@@ -302,6 +304,14 @@ export default async function StoryPage({
           <span className="mt-6 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
             Draft — only you can see this
           </span>
+        )}
+        {story.cover_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={story.cover_url}
+            alt={`Cover of ${story.title}`}
+            className="mt-4 max-h-96 w-auto rounded-lg border border-zinc-200 object-contain dark:border-zinc-800"
+          />
         )}
         <h1 className="mt-3 text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
           {story.title}

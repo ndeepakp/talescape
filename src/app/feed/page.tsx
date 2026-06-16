@@ -19,6 +19,7 @@ type FeedStory = {
   likes: number;
   dislikes: number;
   views: number;
+  cover_url: string | null;
 };
 
 export default async function FeedPage() {
@@ -62,7 +63,8 @@ export default async function FeedPage() {
       COALESCE(array_agg(g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
       (SELECT COUNT(*) FROM reactions r WHERE r.story_id = s.id AND r.value = 1)::int AS likes,
       (SELECT COUNT(*) FROM reactions r WHERE r.story_id = s.id AND r.value = -1)::int AS dislikes,
-      (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id)::int AS views
+      (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id)::int AS views,
+      s.cover_url
     FROM stories s
     JOIN "user" u ON u.id = s.author_id
     LEFT JOIN story_genres sg ON sg.story_id = s.id
@@ -157,8 +159,16 @@ export default async function FeedPage() {
                     ))}
                   </div>
                 )}
-                <Link href={`/stories/${story.id}`}>
-                  <p className="mt-3 line-clamp-4 text-zinc-700 dark:text-zinc-300">{story.summary}</p>
+                <Link href={`/stories/${story.id}`} className="mt-3 flex gap-4">
+                  {story.cover_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={story.cover_url}
+                      alt=""
+                      className="h-32 w-24 shrink-0 rounded-md border border-zinc-200 object-cover dark:border-zinc-800"
+                    />
+                  )}
+                  <p className="line-clamp-4 text-zinc-700 dark:text-zinc-300">{story.summary}</p>
                 </Link>
                 <div className="mt-3 flex items-center gap-4 text-sm text-zinc-500">
                   <span>👍 {story.likes}</span>

@@ -82,3 +82,39 @@ export async function processAvatar(
     throw new ApiError(400, "That file doesn't look like a valid image.");
   }
 }
+
+const COVER_MAX = 1200;
+
+/**
+ * Same validation/sanitisation as processWallpaper, sized for a story cover
+ * (keeps the image's aspect ratio — covers can be portrait or landscape).
+ */
+export async function processCover(
+  file: File,
+): Promise<{ buffer: Buffer; ext: "webp" }> {
+  if (file.size > MAX_BYTES) {
+    throw new ApiError(400, "Image is too large. Please keep it under 8 MB.");
+  }
+  const input = Buffer.from(await file.arrayBuffer());
+  try {
+    const pipeline = sharp(input);
+    const meta = await pipeline.metadata();
+    if (!meta.format || !ALLOWED_INPUT.has(meta.format)) {
+      throw new ApiError(400, "Please upload a JPG, PNG, WEBP, or GIF image.");
+    }
+    const buffer = await pipeline
+      .rotate()
+      .resize({
+        width: COVER_MAX,
+        height: COVER_MAX,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 82 })
+      .toBuffer();
+    return { buffer, ext: "webp" };
+  } catch (err) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(400, "That file doesn't look like a valid image.");
+  }
+}
