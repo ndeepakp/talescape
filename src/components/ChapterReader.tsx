@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAPTER_PAGE_WORDS, wordCount } from "@/lib/story-validation";
+import { ChapterQuestions } from "@/components/ChapterQuestions";
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, " ");
@@ -455,6 +456,8 @@ export function ChapterReader({
                 Page {safePage + 1} / {pages.length}
               </p>
             )}
+
+            <ChapterQuestions storyId={storyId} chapterIndex={current} />
           </>
         )}
 

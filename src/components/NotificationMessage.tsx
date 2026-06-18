@@ -10,7 +10,9 @@ export type Notification = {
     | "subscribe"
     | "reaction"
     | "sub_expiring"
-    | "new_chapter";
+    | "new_chapter"
+    | "mention"
+    | "story_mention";
   actor_id: string | null;
   actor_name: string | null;
   actor_handle: string | null;
@@ -24,6 +26,7 @@ export type Notification = {
     snippet?: string;
     value?: number;
     days_left?: number;
+    post_id?: string;
   };
   seen: boolean;
   created_at: string;
@@ -55,6 +58,21 @@ function Story({ n }: { n: Notification }) {
     );
   }
   return <>your story</>;
+}
+
+// "a post" — a link to the post when we know its id, otherwise plain text.
+function PostLink({ id }: { id?: string }) {
+  if (id) {
+    return (
+      <Link
+        href={`/posts/${id}`}
+        className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
+      >
+        a post
+      </Link>
+    );
+  }
+  return <>a post</>;
 }
 
 // Renders the inline message for one notification. Plain component (no client
@@ -102,6 +120,20 @@ export function NotificationMessage({ n }: { n: Notification }) {
       return (
         <>
           <Actor n={n} /> added a new chapter to <Story n={n} />.
+        </>
+      );
+    case "mention":
+      return (
+        <>
+          <Actor n={n} /> mentioned you in <PostLink id={d.post_id} />
+          {d.snippet ? `: “${d.snippet}”` : ""}.
+        </>
+      );
+    case "story_mention":
+      return (
+        <>
+          <Actor n={n} /> mentioned your story <Story n={n} /> in{" "}
+          <PostLink id={d.post_id} />.
         </>
       );
     case "sub_expiring":

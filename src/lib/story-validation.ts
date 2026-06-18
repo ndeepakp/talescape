@@ -6,6 +6,15 @@ export const MAX_SUMMARY_WORDS = 150;
 // Shared by the reader (ChapterReader) and the write form's hint.
 export const CHAPTER_PAGE_WORDS = 750;
 
+// An engagement question shown after a chapter. `mcq` carries 2+ options;
+// `open` is free-text. `id` is stable (client-generated) so answers survive edits.
+export type Question = {
+  id: string;
+  type: "mcq" | "open";
+  prompt: string;
+  options: string[]; // [] for open questions
+};
+
 // A single chapter the author writes. The title is optional; the body is rich
 // HTML (produced by the TipTap editor). `prices` maps an offered duration tier
 // to the price of buying just this chapter for that long (0 = free).
@@ -13,7 +22,43 @@ export type Chapter = {
   title: string | null;
   body: string;
   prices: Partial<Record<Tier, number>>;
+  questions: Question[];
 };
+
+function newQuestionId(): string {
+  return `q-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+// Cleans an untrusted questions array: trims prompts (drops empty), keeps stable
+// ids, and requires MCQs to have at least two non-empty options.
+export function normalizeQuestions(input: unknown): Question[] {
+  if (!Array.isArray(input)) return [];
+  const out: Question[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as {
+      id?: unknown;
+      type?: unknown;
+      prompt?: unknown;
+      options?: unknown;
+    };
+    const prompt = typeof r.prompt === "string" ? r.prompt.trim() : "";
+    if (!prompt) continue;
+    const type = r.type === "mcq" ? "mcq" : "open";
+    const id = typeof r.id === "string" && r.id ? r.id : newQuestionId();
+    let options: string[] = [];
+    if (type === "mcq") {
+      options = (Array.isArray(r.options) ? r.options : [])
+        .filter((o): o is string => typeof o === "string")
+        .map((o) => o.trim())
+        .filter(Boolean)
+        .slice(0, 8);
+      if (options.length < 2) continue; // an MCQ needs at least two options
+    }
+    out.push({ id, type, prompt: prompt.slice(0, 500), options });
+  }
+  return out;
+}
 
 export function wordCount(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
@@ -48,7 +93,12 @@ export function normalizeChapters(
   const out: Chapter[] = [];
   for (const raw of input) {
     if (!raw || typeof raw !== "object") continue;
-    const r = raw as { title?: unknown; body?: unknown; prices?: unknown };
+    const r = raw as {
+      title?: unknown;
+      body?: unknown;
+      prices?: unknown;
+      questions?: unknown;
+    };
     const bodyHtml = typeof r.body === "string" ? r.body : "";
     if (!htmlToText(bodyHtml)) continue; // skip empty chapters
     const titleStr = typeof r.title === "string" ? r.title.trim() : "";
@@ -56,6 +106,7 @@ export function normalizeChapters(
       title: titleStr ? titleStr : null,
       body: bodyHtml.trim(),
       prices: normalizePrices(r.prices, offered),
+      questions: normalizeQuestions(r.questions),
     });
   }
   return out;

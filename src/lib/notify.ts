@@ -7,7 +7,9 @@ export type NotificationKind =
   | "subscribe"
   | "reaction"
   | "sub_expiring"
-  | "new_chapter";
+  | "new_chapter"
+  | "mention"
+  | "story_mention";
 
 // Records a notification for `userId` (the recipient). Skips self-notifications
 // (e.g. commenting on your own story). Never throws into the caller's flow — a

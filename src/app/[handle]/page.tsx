@@ -8,6 +8,9 @@ import { Avatar } from "@/components/Avatar";
 import { AnalyticsPanel } from "@/components/AnalyticsPanel";
 import { SubscribeButton } from "@/components/SubscribeButton";
 import { ReportButton } from "@/components/ReportButton";
+import { PostsSection } from "@/components/PostsSection";
+import { SideTabs } from "@/components/SideTabs";
+import { getPosts } from "@/lib/posts";
 import { CURRENCY } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
@@ -58,15 +61,12 @@ export default async function ProfilePage({
     subCancelled = row?.cancelled ?? false;
   }
 
-  // For the author themselves: how many readers currently subscribe to them.
-  let subscriberCount = 0;
-  if (isSelf) {
-    const [row] = await sql<{ c: number }[]>`
-      SELECT COUNT(*)::int AS c FROM subscriptions
-      WHERE author_id = ${id} AND expires_at > now()
-    `;
-    subscriberCount = row?.c ?? 0;
-  }
+  // How many readers currently subscribe to this user — public for everyone.
+  const [subRow] = await sql<{ c: number }[]>`
+    SELECT COUNT(*)::int AS c FROM subscriptions
+    WHERE author_id = ${id} AND expires_at > now()
+  `;
+  const subscriberCount = subRow?.c ?? 0;
 
   const [{ followers }] = await sql<{ followers: number }[]>`
     SELECT COUNT(*)::int AS followers FROM follows WHERE following_id = ${id}
@@ -109,6 +109,9 @@ export default async function ProfilePage({
     isFollowing = !!row;
   }
 
+  // This user's community posts.
+  const posts = await getPosts({ viewerId: session.user.id, authorId: id });
+
   return (
     <div className="min-h-screen bg-[var(--page)] px-6 py-12">
       <div className="mx-auto w-full max-w-5xl">
@@ -137,6 +140,10 @@ export default async function ProfilePage({
               <Link href={`/${h}/connections?tab=following`} className="hover:underline">
                 <strong className="text-zinc-900 dark:text-zinc-100">{following}</strong> following
               </Link>
+              <span>
+                <strong className="text-zinc-900 dark:text-zinc-100">{subscriberCount}</strong>{" "}
+                {subscriberCount === 1 ? "subscriber" : "subscribers"}
+              </span>
             </div>
             {isSelf && (
               <p className="mt-2 text-sm text-zinc-500">
@@ -147,8 +154,7 @@ export default async function ProfilePage({
                       {CURRENCY}
                       {user.subscription_price}
                     </strong>{" "}
-                    / 30 days · {subscriberCount}{" "}
-                    {subscriberCount === 1 ? "subscriber" : "subscribers"}
+                    / 30 days
                   </>
                 ) : (
                   <>
@@ -202,63 +208,90 @@ export default async function ProfilePage({
           </section>
         )}
 
-        <h2 className="mt-10 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-          Stories
-        </h2>
-        {stories.length === 0 ? (
-          <p className="mt-4 text-zinc-500">No stories yet.</p>
-        ) : (
-          <ul className="mt-4 flex flex-col gap-4">
-            {stories.map((story) => (
-              <li key={story.id}>
-                <Link
-                  href={`/stories/${story.id}`}
-                  className="block rounded-2xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600"
-                >
-                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                    {story.title}
-                  </h3>
-                  <p className="mt-2 line-clamp-4 text-zinc-700 dark:text-zinc-300">{story.summary}</p>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {isSelf && drafts.length > 0 && (
-          <>
-            <h2 className="mt-10 text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-              Drafts{" "}
-              <span className="text-sm font-normal text-zinc-500">
-                (only you can see these)
-              </span>
-            </h2>
-            <ul className="mt-4 flex flex-col gap-4">
-              {drafts.map((draft) => (
-                <li key={draft.id}>
-                  <Link
-                    href={`/stories/${draft.id}/edit`}
-                    className="block rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-5 transition-colors hover:border-amber-400 dark:border-amber-900 dark:bg-amber-950/20"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                        Draft
-                      </span>
-                      <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                        {draft.title || "Untitled"}
-                      </h3>
-                    </div>
-                    {draft.summary && (
-                      <p className="mt-2 line-clamp-3 text-zinc-700 dark:text-zinc-300">
-                        {draft.summary}
-                      </p>
+        <div className="mt-8">
+          <SideTabs
+            tabs={[
+              {
+                key: "stories",
+                label: "Stories",
+                icon: "📚",
+                count: stories.length,
+                content: (
+                  <>
+                    {stories.length === 0 ? (
+                      <p className="text-zinc-500">No stories yet.</p>
+                    ) : (
+                      <ul className="flex flex-col gap-4">
+                        {stories.map((story) => (
+                          <li key={story.id}>
+                            <Link
+                              href={`/stories/${story.id}`}
+                              className="block rounded-2xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600"
+                            >
+                              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                                {story.title}
+                              </h3>
+                              <p className="mt-2 line-clamp-4 text-zinc-700 dark:text-zinc-300">
+                                {story.summary}
+                              </p>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
                     )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
+
+                    {isSelf && drafts.length > 0 && (
+                      <>
+                        <h3 className="mt-8 text-base font-semibold text-zinc-900 dark:text-zinc-50">
+                          Drafts{" "}
+                          <span className="text-sm font-normal text-zinc-500">
+                            (only you can see these)
+                          </span>
+                        </h3>
+                        <ul className="mt-4 flex flex-col gap-4">
+                          {drafts.map((draft) => (
+                            <li key={draft.id}>
+                              <Link
+                                href={`/stories/${draft.id}/edit`}
+                                className="block rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-5 transition-colors hover:border-amber-400 dark:border-amber-900 dark:bg-amber-950/20"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                                    Draft
+                                  </span>
+                                  <h4 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+                                    {draft.title || "Untitled"}
+                                  </h4>
+                                </div>
+                                {draft.summary && (
+                                  <p className="mt-2 line-clamp-3 text-zinc-700 dark:text-zinc-300">
+                                    {draft.summary}
+                                  </p>
+                                )}
+                              </Link>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </>
+                ),
+              },
+              {
+                key: "posts",
+                label: "Posts",
+                icon: "💬",
+                count: posts.length,
+                content: (
+                  <PostsSection
+                    posts={posts}
+                    emptyText={isSelf ? "You haven't posted yet." : "No posts yet."}
+                  />
+                ),
+              },
+            ]}
+          />
+        </div>
 
         {!isSelf && (
           <div className="mt-12 flex flex-col items-start gap-2 border-t border-zinc-200 pt-6 dark:border-zinc-800">

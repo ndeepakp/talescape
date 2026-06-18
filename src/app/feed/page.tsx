@@ -1,30 +1,16 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getAppearance } from "@/lib/get-appearance";
-import { StarRating } from "@/components/StarRating";
-import { BookCover } from "@/components/BookCover";
-import { type CoverStyle } from "@/lib/cover-style";
+import { Bookshelf, type BookshelfStory } from "@/components/Bookshelf";
+import { ContinueReading } from "@/components/ContinueReading";
+import { PostsFeed } from "@/components/PostsFeed";
+import { SideTabs } from "@/components/SideTabs";
+import { getPosts } from "@/lib/posts";
 
 export const dynamic = "force-dynamic";
-
-type FeedStory = {
-  id: string;
-  title: string;
-  summary: string;
-  created_at: string;
-  author: string | null;
-  author_id: string;
-  author_handle: string | null;
-  genres: string[];
-  rating: number | null;
-  rating_count: number;
-  views: number;
-  cover_url: string | null;
-  cover_style: CoverStyle | null;
-};
 
 export default async function FeedPage() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -50,9 +36,12 @@ export default async function FeedPage() {
     LIMIT 1
   `;
 
+  // Community posts (newest first, all authors).
+  const posts = await getPosts({ viewerId: session.user.id });
+
   // Personalised feed: only stories tagged with one of the reader's favourite
   // genres. A reader with no saved genres (e.g. older accounts) sees everything.
-  const stories = await sql<FeedStory[]>`
+  const stories = await sql<BookshelfStory[]>`
     WITH prefs AS (
       SELECT genre_id FROM user_genres WHERE user_id = ${session.user.id}
     )
@@ -60,7 +49,6 @@ export default async function FeedPage() {
       s.id,
       s.title,
       s.summary,
-      s.created_at,
       u.name AS author,
       u.id AS author_id,
       u.username AS author_handle,
@@ -69,7 +57,10 @@ export default async function FeedPage() {
       (SELECT COUNT(*) FROM reviews rv WHERE rv.story_id = s.id)::int AS rating_count,
       (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id)::int AS views,
       s.cover_url,
-      s.cover_style
+      s.cover_style,
+      s.chapters_public,
+      s.whole_prices,
+      s.currency
     FROM stories s
     JOIN "user" u ON u.id = s.author_id
     LEFT JOIN story_genres sg ON sg.story_id = s.id
@@ -92,7 +83,7 @@ export default async function FeedPage() {
       className="min-h-screen bg-[var(--page)] bg-cover bg-center bg-fixed px-6 py-12"
       style={wallpaper ? { backgroundImage: `url(${wallpaper})` } : undefined}
     >
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-6xl">
         <h1
           className={
             "text-2xl font-bold text-zinc-900 dark:text-zinc-50 " +
@@ -101,101 +92,45 @@ export default async function FeedPage() {
               : "")
           }
         >
-          Stories
+          Your feed
         </h1>
 
-        {resume && (
-          <Link
-            href={`/stories/${resume.story_id}?chapter=${resume.chapter_index}`}
-            className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-accent bg-accent/5 p-4 transition-colors hover:bg-accent/10"
-          >
-            <div className="min-w-0">
-              <p className="text-xs font-medium uppercase tracking-wide text-accent">
-                Continue reading
-              </p>
-              <p className="mt-0.5 truncate font-semibold text-zinc-900 dark:text-zinc-50">
-                {resume.title}
-              </p>
-              <p className="text-sm text-zinc-500">
-                Chapter {resume.chapter_index + 1} · by {resume.author ?? "Unknown"}
-              </p>
-            </div>
-            <span className="shrink-0 rounded-full btn-primary px-4 py-2 text-sm font-medium">
-              Continue from there →
-            </span>
-          </Link>
-        )}
+        {resume &&
+          (await cookies()).get("resume_dismissed")?.value !==
+            `${resume.story_id}:${resume.chapter_index}` && (
+            <ContinueReading resume={resume} />
+          )}
 
-        {stories.length === 0 ? (
-          <p className="mt-12 text-center text-zinc-500">
-            No stories in your favourite genres yet. Why not{" "}
-            <Link href="/write" className="underline">write one</Link>?
-          </p>
-        ) : (
-          <ul className="mt-8 flex flex-col gap-4">
-            {stories.map((story) => (
-              <li
-                key={story.id}
-                className="rounded-2xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600"
-              >
-                <Link href={`/stories/${story.id}`}>
-                  <h2 className="text-lg font-semibold text-zinc-900 hover:underline dark:text-zinc-50">
-                    {story.title}
-                  </h2>
-                </Link>
-                <p className="mt-1 text-sm text-zinc-500">
-                  by{" "}
-                  <Link
-                    href={`/${story.author_handle ?? story.author_id}`}
-                    className="font-medium text-zinc-700 hover:underline dark:text-zinc-300"
-                  >
-                    {story.author ?? "Unknown"}
-                  </Link>
-                </p>
-                {story.genres.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {story.genres.map((name) => (
-                      <span
-                        key={name}
-                        className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                      >
-                        {name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <Link href={`/stories/${story.id}`} className="mt-3 flex gap-4">
-                  {(story.cover_url || story.cover_style) && (
-                    <BookCover
-                      title={story.title}
-                      author={story.author}
-                      coverUrl={story.cover_url}
-                      coverStyle={story.cover_style}
-                      className="h-32 w-24 shrink-0 rounded-md"
-                    />
-                  )}
-                  <p className="line-clamp-4 text-zinc-700 dark:text-zinc-300">{story.summary}</p>
-                </Link>
-                <div className="mt-3 flex items-center gap-4 text-sm text-zinc-500">
-                  {story.rating_count > 0 ? (
-                    <span className="inline-flex items-center gap-1.5" title="Average rating">
-                      <StarRating value={story.rating ?? 0} size={14} />
-                      <span className="font-medium text-zinc-600 dark:text-zinc-300">
-                        {(story.rating ?? 0).toFixed(1)}
-                      </span>
-                      <span className="text-zinc-400">({story.rating_count})</span>
-                    </span>
-                  ) : (
-                    <span className="text-zinc-400">No ratings yet</span>
-                  )}
-                  <span className="inline-flex items-center gap-1" title="Views">
-                    <span aria-hidden="true">👁</span> {story.views}
-                  </span>
+        <SideTabs
+          tabs={[
+            {
+              key: "stories",
+              label: "Stories",
+              icon: "📚",
+              count: stories.length,
+              content:
+                stories.length === 0 ? (
+                  <p className="text-zinc-500">
+                    No stories in your favourite genres yet. Why not{" "}
+                    <Link href="/write" className="underline">write one</Link>?
+                  </p>
+                ) : (
+                  <Bookshelf stories={stories} />
+                ),
+            },
+            {
+              key: "posts",
+              label: "Posts",
+              icon: "💬",
+              count: posts.length,
+              content: (
+                <div className="max-w-2xl">
+                  <PostsFeed posts={posts} />
                 </div>
-              </li>
-            ))}
-          </ul>
-        )}
+              ),
+            },
+          ]}
+        />
       </div>
     </div>
   );

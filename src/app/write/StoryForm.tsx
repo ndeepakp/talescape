@@ -11,6 +11,7 @@ import {
   validateStory,
   wordCount,
   type Chapter,
+  type Question,
 } from "@/lib/story-validation";
 import {
   CURRENCIES,
@@ -21,6 +22,7 @@ import {
   type Tier,
 } from "@/lib/pricing";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { ChapterQuestionsEditor } from "@/components/ChapterQuestionsEditor";
 import { BookCover } from "@/components/BookCover";
 import { COVER_PALETTES, type CoverStyle } from "@/lib/cover-style";
 
@@ -47,7 +49,13 @@ type EditStory = {
 // Local chapter shape: a stable id (so reordering keeps each editor's content
 // attached to the right chapter), an optional title, the HTML body, and the
 // per-duration prices for buying this chapter on its own.
-type DraftChapter = { id: string; title: string; body: string; prices: PriceMap };
+type DraftChapter = {
+  id: string;
+  title: string;
+  body: string;
+  prices: PriceMap;
+  questions: Question[];
+};
 
 const ORIGINALITY_NOTE =
   "I take full responsibility for the originality of this content, and I confirm this story is not available outside TALEROOMS to avoid plagiarism. If it appears anywhere else, it was made available by me.";
@@ -65,6 +73,7 @@ function toDrafts(chapters: Chapter[]): DraftChapter[] {
     title: c.title ?? "",
     body: c.body,
     prices: { ...(c.prices ?? {}) },
+    questions: c.questions ?? [],
   }));
 }
 
@@ -141,6 +150,7 @@ export function StoryForm({
         title: c.title ?? "",
         body: c.body,
         prices: c.prices ?? {},
+        questions: c.questions ?? [],
       })),
       selected: story?.genreIds ?? [],
       chaptersPublic: story?.chaptersPublic ?? false,
@@ -154,7 +164,12 @@ export function StoryForm({
   const currentSnapshot = JSON.stringify({
     title,
     summary,
-    chapters: chapters.map((c) => ({ title: c.title, body: c.body, prices: c.prices })),
+    chapters: chapters.map((c) => ({
+      title: c.title,
+      body: c.body,
+      prices: c.prices,
+      questions: c.questions,
+    })),
     selected,
     chaptersPublic,
     offeredDurations,
@@ -211,7 +226,10 @@ export function StoryForm({
     );
   }
   function addChapter() {
-    setChapters((prev) => [...prev, { id: newId(), title: "", body: "", prices: {} }]);
+    setChapters((prev) => [
+      ...prev,
+      { id: newId(), title: "", body: "", prices: {}, questions: [] },
+    ]);
   }
 
   function toggleTier(tier: Tier) {
@@ -247,6 +265,7 @@ export function StoryForm({
       title: c.title.trim() ? c.title.trim() : null,
       body: c.body,
       prices: chaptersPublic ? {} : c.prices,
+      questions: c.questions,
     }));
     // Skip re-validating when resolving a similarity prompt — already validated.
     if (!opts.decision) {
@@ -774,6 +793,10 @@ export function StoryForm({
                     </div>
                   </div>
                 )}
+                <ChapterQuestionsEditor
+                  questions={chapter.questions}
+                  onChange={(q) => updateChapter(chapter.id, { questions: q })}
+                />
               </div>
             ))}
 
