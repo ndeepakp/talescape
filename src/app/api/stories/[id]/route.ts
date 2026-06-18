@@ -10,6 +10,7 @@ import {
   normalizePrices,
 } from "@/lib/pricing";
 import { COVER_PUBLIC_PREFIX } from "@/lib/cover";
+import { uniqueStorySlug } from "@/lib/slug";
 import { normalizeCoverStyle } from "@/lib/cover-style";
 import { notify } from "@/lib/notify";
 
@@ -99,9 +100,14 @@ export const PUT = withErrors(async (
     }
   }
 
+  // Keep an existing slug stable (changing it would break shared links); only
+  // fill one in for any legacy story that somehow lacks one.
+  const slugFallback = await uniqueStorySlug(cleanTitle, id);
+
   await sql`
     UPDATE stories
-    SET title = ${cleanTitle}, summary = ${cleanSummary},
+    SET title = ${cleanTitle}, slug = COALESCE(slug, ${slugFallback}),
+        summary = ${cleanSummary},
         chapters = ${sql.json(cleanChapters)}, body = ${bodyPlain},
         status = ${isDraft ? "draft" : "published"},
         chapters_public = ${isPublic},

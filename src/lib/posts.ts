@@ -46,6 +46,40 @@ export async function getPosts({
   `;
 }
 
+// Posts that reference a given story. The composer inserts story links as
+// "[Title](/stories/<slug-or-uuid>)" tokens, so a post is "about" a story when
+// its body contains that story's link token. Newer posts use the slug and older
+// ones the UUID, so we match either.
+export async function getStoryPosts(
+  storyId: string,
+  viewerId: string,
+  slug?: string | null,
+  limit = 50,
+): Promise<PostRow[]> {
+  const uuidToken = `%(/stories/${storyId})%`;
+  const slugToken = slug ? `%(/stories/${slug})%` : null;
+  return sql<PostRow[]>`
+    SELECT
+      p.id, p.body, p.created_at, p.author_id,
+      u.name AS author, u.username AS handle, u.image,
+      (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id)::int AS like_count,
+      EXISTS (
+        SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ${viewerId}
+      ) AS liked_by_me,
+      (SELECT COUNT(*) FROM post_comments pc WHERE pc.post_id = p.id)::int AS comment_count,
+      (p.author_id = ${viewerId}) AS mine,
+      EXISTS (
+        SELECT 1 FROM post_mentions pm WHERE pm.post_id = p.id AND pm.user_id = ${viewerId}
+      ) AS mentions_me
+    FROM posts p
+    JOIN "user" u ON u.id = p.author_id
+    WHERE p.body LIKE ${uuidToken}
+      ${slugToken ? sql`OR p.body LIKE ${slugToken}` : sql``}
+    ORDER BY p.created_at DESC
+    LIMIT ${limit}
+  `;
+}
+
 // A single post by id (for the post permalink page), or null if missing.
 export async function getPost(id: string, viewerId: string): Promise<PostRow | null> {
   const [p] = await sql<PostRow[]>`

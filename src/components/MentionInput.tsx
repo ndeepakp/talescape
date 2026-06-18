@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 type UserHit = { handle: string; name: string | null; image: string | null };
-type StoryHit = { id: string; title: string };
+type StoryHit = { id: string; slug: string | null; title: string };
 
 // A textarea that autocompletes @people and story titles. Typing "@word" opens a
 // dropdown; picking a person inserts "@handle", picking a story inserts a link
@@ -82,7 +82,10 @@ export function MentionInput({
     const it = items[i];
     if (!it) return;
     if (it.kind === "user") insert(`@${it.u.handle}`);
-    else insert(`[${it.s.title.replace(/[[\]()]/g, "")}](/stories/${it.s.id})`);
+    else
+      insert(
+        `[${it.s.title.replace(/[[\]()]/g, "")}](/stories/${it.s.slug ?? it.s.id})`,
+      );
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

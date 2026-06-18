@@ -22,7 +22,7 @@ export function BookCover({
       <img
         src={coverUrl}
         alt={`Cover of ${title}`}
-        className={`${className} border border-zinc-200 object-cover dark:border-zinc-800`}
+        className={`${className} border-2 border-accent object-cover`}
       />
     );
   }
@@ -33,7 +33,7 @@ export function BookCover({
       <div
         role="img"
         aria-label={`Cover of ${title}`}
-        className={`${className} flex flex-col items-center justify-between overflow-hidden p-3 text-center`}
+        className={`${className} flex flex-col items-center justify-between overflow-hidden border-2 border-accent p-3 text-center`}
         style={{ background: pal.bg, color: pal.fg }}
       >
         <span
@@ -62,7 +62,7 @@ export function BookCover({
     <div
       role="img"
       aria-label={`Cover of ${title}`}
-      className={`${className} flex items-center justify-center border border-zinc-200 bg-zinc-100 text-3xl text-zinc-300 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-600`}
+      className={`${className} flex items-center justify-center border-2 border-accent bg-zinc-100 text-3xl text-zinc-300 dark:bg-zinc-800 dark:text-zinc-600`}
     >
       📖
     </div>

@@ -85,7 +85,9 @@ export function PostCard({ post }: { post: PostRow }) {
     <div className="rounded-2xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Avatar src={post.image} name={post.author} size={36} />
+          <Link href={`/${post.handle ?? post.author_id}`} aria-label={`${post.author ?? "Author"}'s profile`}>
+            <Avatar src={post.image} name={post.author} size={36} />
+          </Link>
           <div>
             <Link
               href={`/${post.handle ?? post.author_id}`}
@@ -115,12 +117,28 @@ export function PostCard({ post }: { post: PostRow }) {
         <button
           type="button"
           onClick={toggleLike}
+          aria-pressed={liked}
+          aria-label={liked ? "Unlike" : "Like"}
           className={
-            "inline-flex items-center gap-1.5 " +
-            (liked ? "text-rose-600 dark:text-rose-400" : "hover:text-zinc-700 dark:hover:text-zinc-300")
+            "inline-flex items-center gap-1.5 transition-colors " +
+            (liked ? "text-rose-600 dark:text-rose-400" : "hover:text-rose-600 dark:hover:text-rose-400")
           }
         >
-          <span aria-hidden="true">{liked ? "♥" : "♡"}</span> {likeCount}
+          <svg
+            viewBox="0 0 24 24"
+            width="18"
+            height="18"
+            aria-hidden="true"
+            fill={liked ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={liked ? "scale-110 transition-transform" : "transition-transform"}
+          >
+            <path d="M12 20.5l-1.45-1.32C5.4 14.5 2 11.4 2 7.6 2 4.5 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.5 22 7.6c0 3.8-3.4 6.9-8.55 11.59L12 20.5z" />
+          </svg>
+          {likeCount}
         </button>
         <button
           type="button"

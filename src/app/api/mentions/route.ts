@@ -17,8 +17,8 @@ export const GET = withErrors(async (req: Request) => {
     LIMIT 6
   `;
 
-  const stories = await sql<{ id: string; title: string }[]>`
-    SELECT id, title FROM stories
+  const stories = await sql<{ id: string; slug: string | null; title: string }[]>`
+    SELECT id, slug, title FROM stories
     WHERE status = 'published' AND title ILIKE ${"%" + like + "%"}
     ORDER BY title
     LIMIT 6

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ApiError, requireSession, withErrors } from "@/lib/http";
+import { notify } from "@/lib/notify";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_NOTE = 1500;
@@ -28,8 +29,8 @@ export const POST = withErrors(async (
 
   // Only readers with access may review: the author, a public story, an active
   // subscriber, or anyone holding an active access grant.
-  const [acc] = await sql<{ allowed: boolean }[]>`
-    SELECT (
+  const [acc] = await sql<{ allowed: boolean; author_id: string }[]>`
+    SELECT s.author_id, (
       s.author_id = ${userId}
       OR s.chapters_public
       OR EXISTS (
@@ -56,6 +57,15 @@ export const POST = withErrors(async (
       SET stars = ${stars}, liked = ${liked}, disliked = ${disliked}, updated_at = now()
     RETURNING id
   `;
+
+  // Let the author know their story was rated (skips self-reviews via notify).
+  await notify({
+    userId: acc.author_id,
+    kind: "review",
+    actorId: userId,
+    storyId: id,
+    data: { stars },
+  });
 
   return NextResponse.json({ id: row.id, stars, liked, disliked });
 });

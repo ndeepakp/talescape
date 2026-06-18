@@ -79,12 +79,13 @@ export default async function ProfilePage({
   const stories = await sql<
     {
       id: string;
+      slug: string | null;
       title: string;
       summary: string;
       created_at: string;
     }[]
   >`
-    SELECT id, title, summary, created_at
+    SELECT id, slug, title, summary, created_at
     FROM stories
     WHERE author_id = ${id} AND status = 'published'
     ORDER BY created_at DESC
@@ -215,7 +216,6 @@ export default async function ProfilePage({
                 key: "stories",
                 label: "Stories",
                 icon: "📚",
-                count: stories.length,
                 content: (
                   <>
                     {stories.length === 0 ? (
@@ -225,7 +225,7 @@ export default async function ProfilePage({
                         {stories.map((story) => (
                           <li key={story.id}>
                             <Link
-                              href={`/stories/${story.id}`}
+                              href={`/stories/${story.slug ?? story.id}`}
                               className="block rounded-2xl border border-zinc-200 bg-white p-5 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600"
                             >
                               <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
@@ -281,7 +281,6 @@ export default async function ProfilePage({
                 key: "posts",
                 label: "Posts",
                 icon: "💬",
-                count: posts.length,
                 content: (
                   <PostsSection
                     posts={posts}

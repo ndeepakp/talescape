@@ -12,7 +12,10 @@ export type Notification = {
     | "sub_expiring"
     | "new_chapter"
     | "mention"
-    | "story_mention";
+    | "story_mention"
+    | "post_like"
+    | "post_comment"
+    | "review";
   actor_id: string | null;
   actor_name: string | null;
   actor_handle: string | null;
@@ -27,6 +30,7 @@ export type Notification = {
     value?: number;
     days_left?: number;
     post_id?: string;
+    stars?: number;
   };
   seen: boolean;
   created_at: string;
@@ -60,19 +64,20 @@ function Story({ n }: { n: Notification }) {
   return <>your story</>;
 }
 
-// "a post" — a link to the post when we know its id, otherwise plain text.
-function PostLink({ id }: { id?: string }) {
+// A link to a post when we know its id, otherwise plain text. Defaults to the
+// label "a post"; callers can pass "your post" etc.
+function PostLink({ id, label = "a post" }: { id?: string; label?: string }) {
   if (id) {
     return (
       <Link
         href={`/posts/${id}`}
         className="font-medium text-zinc-900 hover:underline dark:text-zinc-100"
       >
-        a post
+        {label}
       </Link>
     );
   }
-  return <>a post</>;
+  return <>{label}</>;
 }
 
 // Renders the inline message for one notification. Plain component (no client
@@ -134,6 +139,26 @@ export function NotificationMessage({ n }: { n: Notification }) {
         <>
           <Actor n={n} /> mentioned your story <Story n={n} /> in{" "}
           <PostLink id={d.post_id} />.
+        </>
+      );
+    case "post_like":
+      return (
+        <>
+          <Actor n={n} /> liked <PostLink id={d.post_id} label="your post" />.
+        </>
+      );
+    case "post_comment":
+      return (
+        <>
+          <Actor n={n} /> commented on <PostLink id={d.post_id} label="your post" />
+          {d.snippet ? `: “${d.snippet}”` : ""}.
+        </>
+      );
+    case "review":
+      return (
+        <>
+          <Actor n={n} /> rated <Story n={n} />
+          {typeof d.stars === "number" ? ` ${d.stars}★` : ""}.
         </>
       );
     case "sub_expiring":

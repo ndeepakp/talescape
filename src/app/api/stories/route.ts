@@ -10,6 +10,7 @@ import {
   normalizePrices,
 } from "@/lib/pricing";
 import { COVER_PUBLIC_PREFIX } from "@/lib/cover";
+import { uniqueStorySlug } from "@/lib/slug";
 import { normalizeCoverStyle } from "@/lib/cover-style";
 
 export const POST = withErrors(async (req: Request) => {
@@ -79,14 +80,16 @@ export const POST = withErrors(async (req: Request) => {
     }
   }
 
+  const storySlug = await uniqueStorySlug(cleanTitle);
+
   const [story] = await sql<{ id: string }[]>`
     INSERT INTO stories (
-      author_id, title, summary, chapters, body, status, chapters_public,
+      author_id, title, slug, summary, chapters, body, status, chapters_public,
       offered_durations, whole_prices, currency, cover_url, cover_style,
       draft_expires_at, embedding
     )
     VALUES (
-      ${session.user.id}, ${cleanTitle}, ${cleanSummary},
+      ${session.user.id}, ${cleanTitle}, ${storySlug}, ${cleanSummary},
       ${sql.json(cleanChapters)}, ${bodyPlain},
       ${isDraft ? "draft" : "published"}, ${isPublic},
       ${offered}, ${sql.json(wholePriceMap)}, ${storyCurrency}, ${cover},

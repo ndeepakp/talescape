@@ -166,6 +166,12 @@ If you like what TALEROOMS is building, please reach out to
 8. **Weekly rankings.** A leaderboard of the most‑read content each week.
 9. **More formats.** Genres expanding beyond prose into **lyrics, poems and
    ghazals**.
+10. **Robust word lookups.** The in‑reader "Meaning" feature (highlight a word to
+    see its definition) is currently English‑only and depends on an external
+    service. dictionaryapi.dev is free/community‑run with no SLA — if it's slow or
+    down, the card shows "Couldn't reach the dictionary." For a polished product
+    you may later want a paid dictionary (Merriam‑Webster/Oxford) or a local
+    wordlist, but this is a solid zero‑cost start.
 
 ---
 

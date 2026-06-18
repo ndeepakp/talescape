@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { ApiError, requireSession, withErrors } from "@/lib/http";
-import { extractMentions, extractStoryMentions } from "@/lib/mentions";
+import { cleanSnippet, extractMentions, extractStoryMentions } from "@/lib/mentions";
 import { notify } from "@/lib/notify";
 
 const MAX_BODY = 2000;
@@ -34,7 +34,7 @@ export const POST = withErrors(async (req: Request) => {
         )}
         ON CONFLICT DO NOTHING
       `;
-      const snippet = text.slice(0, 120);
+      const snippet = cleanSnippet(text);
       for (const u of users) {
         await notify({
           userId: u.id,
@@ -47,13 +47,15 @@ export const POST = withErrors(async (req: Request) => {
   }
 
   // Notify the author of any story mentioned in the post (skips the poster's
-  // own stories via notify()'s self-check).
-  const storyIds = extractStoryMentions(text);
-  if (storyIds.length > 0) {
+  // own stories via notify()'s self-check). Tokens may carry a slug or a legacy
+  // UUID, so match on either.
+  const storyRefs = extractStoryMentions(text);
+  if (storyRefs.length > 0) {
     const stories = await sql<{ id: string; author_id: string }[]>`
-      SELECT id, author_id FROM stories WHERE id = ANY(${storyIds})
+      SELECT id, author_id FROM stories
+      WHERE slug = ANY(${storyRefs}) OR id::text = ANY(${storyRefs})
     `;
-    const snippet = text.slice(0, 120);
+    const snippet = cleanSnippet(text);
     for (const s of stories) {
       await notify({
         userId: s.author_id,

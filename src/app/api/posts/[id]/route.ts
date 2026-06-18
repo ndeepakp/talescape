@@ -21,7 +21,8 @@ export const DELETE = withErrors(async (
     // post's likes/comments are cleaned up by ON DELETE CASCADE).
     await sql`
       DELETE FROM notifications
-      WHERE kind IN ('mention', 'story_mention') AND data->>'post_id' = ${id}
+      WHERE kind IN ('mention', 'story_mention', 'post_like', 'post_comment')
+        AND data->>'post_id' = ${id}
     `;
   }
   return NextResponse.json({ ok: true });

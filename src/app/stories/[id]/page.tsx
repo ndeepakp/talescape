@@ -9,7 +9,10 @@ import { ReviewPanel } from "@/components/ReviewPanel";
 import { PinReviewButton } from "@/components/PinReviewButton";
 import { BookCover } from "@/components/BookCover";
 import { type CoverStyle } from "@/lib/cover-style";
-import { CommentForm } from "@/components/CommentForm";
+import { PostCard } from "@/components/PostCard";
+import { PostComposer } from "@/components/PostComposer";
+import { getStoryPosts } from "@/lib/posts";
+import { resolveStory, isUuid } from "@/lib/slug";
 import { DeleteStoryButton } from "@/components/DeleteStoryButton";
 import { AccessPanel } from "@/components/AccessPanel";
 import { ApprovedReadersList } from "@/components/ApprovedReadersList";
@@ -19,8 +22,6 @@ import { SaveToCollection } from "@/components/SaveToCollection";
 import { type Tier } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type Story = {
   id: string;
@@ -53,12 +54,21 @@ export default async function StoryPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ chapter?: string }>;
 }) {
-  const { id } = await params;
+  const { id: param } = await params;
   const { chapter: chapterParam } = await searchParams;
-  if (!UUID_RE.test(id)) notFound();
 
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
+
+  // The route param may be a clean slug or a legacy UUID. Resolve it, and if it
+  // came in as a UUID, redirect to the canonical slug URL so the address bar
+  // shows the readable form.
+  const resolved = await resolveStory(param);
+  if (!resolved) notFound();
+  if (isUuid(param) && resolved.slug) {
+    redirect(`/stories/${resolved.slug}${chapterParam ? `?chapter=${chapterParam}` : ""}`);
+  }
+  const id = resolved.id;
 
   // Public columns only. The private "chapters" (and the internal "body") are
   // fetched separately and ONLY for the author — they are never selected here,
@@ -255,20 +265,8 @@ export default async function StoryPage({
   `;
   const myReview = reviews.find((r) => r.mine) ?? null;
 
-  const comments = await sql<
-    {
-      id: string;
-      body: string;
-      created_at: string;
-      author: string | null;
-    }[]
-  >`
-    SELECT c.id, c.body, c.created_at, u.name AS author
-    FROM comments c
-    JOIN "user" u ON u.id = c.user_id
-    WHERE c.story_id = ${id}
-    ORDER BY c.created_at ASC
-  `;
+  // Posts the community has made about this story (replaces the old comments).
+  const storyPosts = await getStoryPosts(id, session.user.id, resolved.slug);
 
   // Stories this one credits or resembles (set at publish time).
   const attributions = await sql<
@@ -550,37 +548,33 @@ export default async function StoryPage({
 
         <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-            Comments ({comments.length})
+            Posts about this story
           </h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            Share your thoughts — your post goes to the community feed and links
+            back here.
+          </p>
 
           <div className="mt-4">
-            {session ? (
-              <CommentForm storyId={story.id} />
-            ) : (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400">
-                <Link href="/login" className="font-medium underline">
-                  Log in
-                </Link>{" "}
-                to join the conversation.
-              </p>
-            )}
+            <PostComposer
+              attachStory={{ id: story.id, slug: resolved.slug, title: story.title }}
+              placeholder="Write a post about this story… type @ to tag a person or another story"
+            />
           </div>
 
-          <ul className="mt-6 flex flex-col gap-4">
-            {comments.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
-              >
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {c.author ?? "Unknown"}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
-                  {c.body}
-                </p>
-              </li>
-            ))}
-          </ul>
+          {storyPosts.length === 0 ? (
+            <p className="mt-6 text-sm text-zinc-500">
+              No posts about this story yet — be the first.
+            </p>
+          ) : (
+            <ul className="mt-6 flex flex-col gap-4">
+              {storyPosts.map((p) => (
+                <li key={p.id}>
+                  <PostCard post={p} />
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         {similar.length > 0 && (

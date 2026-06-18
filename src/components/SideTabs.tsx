@@ -6,7 +6,6 @@ export type SideTab = {
   key: string;
   label: string;
   icon?: string;
-  count?: number;
   content: ReactNode;
 };
 
@@ -37,11 +36,6 @@ export function SideTabs({ tabs }: { tabs: SideTab[] }) {
             >
               {t.icon && <span aria-hidden="true">{t.icon}</span>}
               <span>{t.label}</span>
-              {typeof t.count === "number" && (
-                <span className={"ml-auto text-xs " + (on ? "opacity-80" : "text-zinc-400")}>
-                  {t.count}
-                </span>
-              )}
             </button>
           );
         })}

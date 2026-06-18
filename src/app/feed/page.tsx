@@ -47,6 +47,7 @@ export default async function FeedPage() {
     )
     SELECT
       s.id,
+      s.slug,
       s.title,
       s.summary,
       u.name AS author,
@@ -107,7 +108,6 @@ export default async function FeedPage() {
               key: "stories",
               label: "Stories",
               icon: "📚",
-              count: stories.length,
               content:
                 stories.length === 0 ? (
                   <p className="text-zinc-500">
@@ -122,7 +122,6 @@ export default async function FeedPage() {
               key: "posts",
               label: "Posts",
               icon: "💬",
-              count: posts.length,
               content: (
                 <div className="max-w-2xl">
                   <PostsFeed posts={posts} />

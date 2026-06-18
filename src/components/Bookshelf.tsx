@@ -9,6 +9,7 @@ import { type CoverStyle } from "@/lib/cover-style";
 
 export type BookshelfStory = {
   id: string;
+  slug?: string | null;
   title: string;
   summary: string;
   author: string | null;
@@ -76,9 +77,12 @@ function DetailPane({
             className="h-44 w-32 shrink-0 rounded-md shadow"
           />
           <div className="min-w-0">
-            <h2 className="text-lg font-bold leading-tight text-zinc-900 dark:text-zinc-50">
+            <Link
+              href={`/stories/${story.slug ?? story.id}`}
+              className="text-lg font-bold leading-tight text-zinc-900 hover:underline dark:text-zinc-50"
+            >
               {story.title}
-            </h2>
+            </Link>
             <p className="mt-0.5 text-sm text-zinc-500">
               by{" "}
               <Link
@@ -88,9 +92,9 @@ function DetailPane({
                 {story.author ?? "Unknown"}
               </Link>
             </p>
-            <div className="mt-2">
+            <Link href={`/stories/${story.slug ?? story.id}/reviews`} className="mt-2 inline-block">
               <Rating s={story} size={13} />
-            </div>
+            </Link>
             <p className="mt-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
               {charges(story)}
             </p>
@@ -115,7 +119,7 @@ function DetailPane({
         </p>
 
         <Link
-          href={`/stories/${story.id}`}
+          href={`/stories/${story.slug ?? story.id}`}
           className="mt-5 inline-flex rounded-full btn-primary px-4 py-2 text-sm font-medium"
         >
           Open to read →
@@ -135,34 +139,48 @@ export function Bookshelf({ stories }: { stories: BookshelfStory[] }) {
           opened, then it shares the row with the detail pane on the right. */}
       <div className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(130px,1fr))] gap-5">
         {stories.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => setSelId(s.id)}
-            className="group flex flex-col gap-2 text-left"
-          >
-            <BookCover
-              title={s.title}
-              author={s.author}
-              coverUrl={s.cover_url}
-              coverStyle={s.cover_style}
-              className={
-                "aspect-[2/3] w-full rounded-md shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-md " +
-                (s.id === selId ? "ring-2 ring-accent" : "")
-              }
-            />
+          <div key={s.id} className="group flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setSelId(s.id)}
+              aria-label={`Preview ${s.title}`}
+              className="text-left"
+            >
+              <BookCover
+                title={s.title}
+                author={s.author}
+                coverUrl={s.cover_url}
+                coverStyle={s.cover_style}
+                className={
+                  "aspect-[2/3] w-full rounded-md shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-md " +
+                  (s.id === selId
+                    ? "ring-1 ring-accent ring-offset-2 ring-offset-[var(--page)]"
+                    : "")
+                }
+              />
+            </button>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
+              <Link
+                href={`/stories/${s.slug ?? s.id}`}
+                className="block truncate text-sm font-medium text-zinc-900 hover:underline dark:text-zinc-100"
+              >
                 {s.title}
-              </p>
-              <p className="truncate text-xs text-zinc-500">
+              </Link>
+              <Link
+                href={`/${s.author_handle ?? s.author_id}`}
+                className="block truncate text-xs text-zinc-500 hover:underline"
+              >
                 {s.author ?? "Unknown"}
-              </p>
-              <div className="mt-0.5">
+              </Link>
+              <Link
+                href={`/stories/${s.slug ?? s.id}/reviews`}
+                className="mt-0.5 inline-block"
+                aria-label="See ratings"
+              >
                 <Rating s={s} size={11} />
-              </div>
+              </Link>
             </div>
-          </button>
+          </div>
         ))}
       </div>
 

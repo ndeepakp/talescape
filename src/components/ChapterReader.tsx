@@ -104,6 +104,16 @@ export function ChapterReader({
     text: string;
     occurrence: number;
   } | null>(null);
+  // The dictionary lookup card for a highlighted word.
+  const [def, setDef] = useState<{
+    word: string;
+    top: number;
+    left: number;
+    loading: boolean;
+    phonetic?: string | null;
+    entries?: { partOfSpeech: string; definitions: string[] }[];
+    error?: string;
+  } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   const chapter = chapters[current];
@@ -305,6 +315,39 @@ export function ChapterReader({
     }
   }
 
+  // Look up the meaning of the highlighted word and show a definition card.
+  async function lookupMeaning() {
+    if (!sel) return;
+    const word = sel.text.trim();
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+    const top = sel.top + 44; // sit just below where the action buttons were
+    const left = Math.max(8, Math.min(sel.left, vw - 300));
+    setSel(null);
+    window.getSelection()?.removeAllRanges();
+    setDef({ word, top, left, loading: true });
+    try {
+      const res = await fetch(`/api/define?word=${encodeURIComponent(word)}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDef((cur) => (cur ? { ...cur, loading: false, error: data.error ?? "Lookup failed." } : cur));
+        return;
+      }
+      setDef((cur) =>
+        cur
+          ? {
+              ...cur,
+              loading: false,
+              phonetic: data.phonetic ?? null,
+              entries: data.entries ?? [],
+              error: (data.entries ?? []).length === 0 ? "No definition found." : undefined,
+            }
+          : cur,
+      );
+    } catch {
+      setDef((cur) => (cur ? { ...cur, loading: false, error: "Lookup failed." } : cur));
+    }
+  }
+
   async function removeBookmark(id: string) {
     const res = await fetch(`/api/bookmarks/${id}`, { method: "DELETE" });
     if (res.ok) setBookmarks((prev) => prev.filter((b) => b.id !== id));
@@ -312,6 +355,7 @@ export function ChapterReader({
 
   function selectChapter(i: number) {
     setSel(null);
+    setDef(null);
     setFlipDir(null); // changing chapters shouldn't animate like a page flip
     setCurrent(i);
     setPage(0);
@@ -319,6 +363,7 @@ export function ChapterReader({
 
   function goPage(p: number) {
     setSel(null);
+    setDef(null);
     setFlipDir(p > safePage ? "next" : "prev");
     setPage(p);
     bodyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -327,7 +372,13 @@ export function ChapterReader({
   if (chapters.length === 0) return null;
 
   return (
-    <div className="mt-6" onMouseDown={() => setSel(null)}>
+    <div
+      className="mt-6"
+      onMouseDown={() => {
+        setSel(null);
+        setDef(null);
+      }}
+    >
       {/* Chapter pagination buttons */}
       <div className="flex flex-wrap gap-2">
         {chapters.map((ch) => {
@@ -397,7 +448,8 @@ export function ChapterReader({
             )}
 
             <p className="mt-3 text-xs text-zinc-400">
-              Tip: select any word or line and click “Bookmark” to save your spot.
+              Tip: select any word or line to bookmark your spot — or highlight a
+              single word to look up its meaning.
             </p>
 
             <div className="mt-3 flex items-center gap-2 sm:gap-4">
@@ -485,20 +537,85 @@ export function ChapterReader({
         </div>
       </div>
 
-      {/* Floating "Bookmark" button shown over a text selection */}
+      {/* Floating actions shown over a text selection: bookmark, and — for a
+          single word — look up its meaning. */}
       {sel && (
-        <button
-          type="button"
+        <div
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          onClick={addBookmark}
           style={{ position: "fixed", top: sel.top, left: sel.left, zIndex: 60 }}
-          className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg shadow-lg"
+          className="flex items-center gap-1 rounded-full bg-accent p-1 shadow-lg"
         >
-          ★ Bookmark
-        </button>
+          <button
+            type="button"
+            onClick={addBookmark}
+            className="rounded-full px-2.5 py-1 text-xs font-medium text-accent-fg hover:bg-black/10"
+          >
+            ★ Bookmark
+          </button>
+          {/^[a-zA-Z][a-zA-Z'-]*$/.test(sel.text) && (
+            <button
+              type="button"
+              onClick={lookupMeaning}
+              className="rounded-full px-2.5 py-1 text-xs font-medium text-accent-fg hover:bg-black/10"
+            >
+              📖 Meaning
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Definition card for a looked-up word */}
+      {def && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: "fixed", top: def.top, left: def.left, zIndex: 60, width: 288 }}
+          className="rounded-xl border border-zinc-200 bg-white p-3 shadow-xl dark:border-zinc-700 dark:bg-zinc-900"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate font-semibold text-zinc-900 dark:text-zinc-50">
+                {def.word}
+              </p>
+              {def.phonetic && (
+                <p className="text-xs text-zinc-400">{def.phonetic}</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDef(null)}
+              aria-label="Close"
+              className="shrink-0 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+            >
+              ✕
+            </button>
+          </div>
+
+          {def.loading ? (
+            <p className="mt-2 text-sm text-zinc-400">Looking up…</p>
+          ) : def.error ? (
+            <p className="mt-2 text-sm text-zinc-500">{def.error}</p>
+          ) : (
+            <div className="mt-2 flex max-h-56 flex-col gap-2 overflow-auto">
+              {def.entries?.map((m, i) => (
+                <div key={i}>
+                  {m.partOfSpeech && (
+                    <p className="text-xs font-medium italic text-accent">
+                      {m.partOfSpeech}
+                    </p>
+                  )}
+                  <ul className="ml-4 list-disc text-sm text-zinc-700 dark:text-zinc-300">
+                    {m.definitions.map((d, j) => (
+                      <li key={j}>{d}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
