@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getAppearance } from "@/lib/get-appearance";
+import { StarRating } from "@/components/StarRating";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,8 @@ type FeedStory = {
   author_id: string;
   author_handle: string | null;
   genres: string[];
-  likes: number;
-  dislikes: number;
+  rating: number | null;
+  rating_count: number;
   views: number;
   cover_url: string | null;
 };
@@ -61,8 +62,8 @@ export default async function FeedPage() {
       u.id AS author_id,
       u.username AS author_handle,
       COALESCE(array_agg(g.name) FILTER (WHERE g.name IS NOT NULL), '{}') AS genres,
-      (SELECT COUNT(*) FROM reactions r WHERE r.story_id = s.id AND r.value = 1)::int AS likes,
-      (SELECT COUNT(*) FROM reactions r WHERE r.story_id = s.id AND r.value = -1)::int AS dislikes,
+      (SELECT ROUND(AVG(stars), 1) FROM reviews rv WHERE rv.story_id = s.id)::float AS rating,
+      (SELECT COUNT(*) FROM reviews rv WHERE rv.story_id = s.id)::int AS rating_count,
       (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id)::int AS views,
       s.cover_url
     FROM stories s
@@ -171,8 +172,17 @@ export default async function FeedPage() {
                   <p className="line-clamp-4 text-zinc-700 dark:text-zinc-300">{story.summary}</p>
                 </Link>
                 <div className="mt-3 flex items-center gap-4 text-sm text-zinc-500">
-                  <span>👍 {story.likes}</span>
-                  <span>👎 {story.dislikes}</span>
+                  {story.rating_count > 0 ? (
+                    <span className="inline-flex items-center gap-1.5" title="Average rating">
+                      <StarRating value={story.rating ?? 0} size={14} />
+                      <span className="font-medium text-zinc-600 dark:text-zinc-300">
+                        {(story.rating ?? 0).toFixed(1)}
+                      </span>
+                      <span className="text-zinc-400">({story.rating_count})</span>
+                    </span>
+                  ) : (
+                    <span className="text-zinc-400">No ratings yet</span>
+                  )}
                   <span className="inline-flex items-center gap-1" title="Views">
                     <span aria-hidden="true">👁</span> {story.views}
                   </span>

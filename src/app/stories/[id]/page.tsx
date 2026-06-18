@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { ReactionBar } from "@/components/ReactionBar";
+import { Avatar } from "@/components/Avatar";
+import { StarRating } from "@/components/StarRating";
+import { ReviewPanel } from "@/components/ReviewPanel";
 import { CommentForm } from "@/components/CommentForm";
 import { DeleteStoryButton } from "@/components/DeleteStoryButton";
 import { AccessPanel } from "@/components/AccessPanel";
@@ -222,21 +224,31 @@ export default async function StoryPage({
     }));
   }
 
-  const [reactionCounts] = await sql<{ likes: number; dislikes: number }[]>`
-    SELECT
-      COUNT(*) FILTER (WHERE value = 1)::int AS likes,
-      COUNT(*) FILTER (WHERE value = -1)::int AS dislikes
-    FROM reactions
-    WHERE story_id = ${id}
+  // Reviews replace the old like/dislike. Only readers with access may review.
+  const hasAccess = unlockedWhole || unlockedIdx.size > 0;
+  const [reviewAgg] = await sql<{ avg: number | null; count: number }[]>`
+    SELECT ROUND(AVG(stars), 1)::float AS avg, COUNT(*)::int AS count
+    FROM reviews WHERE story_id = ${id}
   `;
-
-  let userReaction: number | null = null;
-  if (session) {
-    const [r] = await sql<{ value: number }[]>`
-      SELECT value FROM reactions WHERE story_id = ${id} AND user_id = ${session.user.id}
-    `;
-    userReaction = r?.value ?? null;
-  }
+  const reviews = await sql<{
+    id: string;
+    stars: number;
+    liked: string | null;
+    disliked: string | null;
+    pinned: boolean;
+    author: string | null;
+    handle: string | null;
+    image: string | null;
+    mine: boolean;
+  }[]>`
+    SELECT r.id, r.stars::float AS stars, r.liked, r.disliked, r.pinned,
+           u.name AS author, u.username AS handle, u.image,
+           (r.user_id = ${session.user.id}) AS mine
+    FROM reviews r JOIN "user" u ON u.id = r.user_id
+    WHERE r.story_id = ${id}
+    ORDER BY r.pinned DESC, r.updated_at DESC
+  `;
+  const myReview = reviews.find((r) => r.mine) ?? null;
 
   const comments = await sql<
     {
@@ -441,15 +453,89 @@ export default async function StoryPage({
           )
         )}
 
-        <div className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
-          <ReactionBar
-            storyId={story.id}
-            initialLikes={reactionCounts.likes}
-            initialDislikes={reactionCounts.dislikes}
-            initialUserReaction={userReaction}
-            isLoggedIn={!!session}
-          />
-        </div>
+        <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              Reviews
+            </h2>
+            {reviewAgg.count > 0 ? (
+              <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                <StarRating value={reviewAgg.avg ?? 0} size={18} />
+                <span className="font-medium">{(reviewAgg.avg ?? 0).toFixed(1)}</span>
+                <span className="text-zinc-400">
+                  · {reviewAgg.count} {reviewAgg.count === 1 ? "review" : "reviews"}
+                </span>
+              </div>
+            ) : (
+              <span className="text-sm text-zinc-400">No reviews yet</span>
+            )}
+          </div>
+
+          <div className="mt-4">
+            <ReviewPanel
+              storyId={story.id}
+              canReview={hasAccess}
+              initial={
+                myReview
+                  ? {
+                      stars: myReview.stars,
+                      liked: myReview.liked,
+                      disliked: myReview.disliked,
+                    }
+                  : null
+              }
+            />
+          </div>
+
+          {reviews.length > 0 && (
+            <ul className="mt-6 flex flex-col gap-4">
+              {reviews.map((r) => (
+                <li
+                  key={r.id}
+                  className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <Avatar src={r.image} name={r.author} size={36} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                          {r.author ?? "Reader"}
+                          {r.mine && (
+                            <span className="ml-1 text-xs font-normal text-zinc-400">
+                              (you)
+                            </span>
+                          )}
+                        </p>
+                        <StarRating value={r.stars} size={14} />
+                      </div>
+                    </div>
+                    {r.pinned && (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                        📌 Pinned by author
+                      </span>
+                    )}
+                  </div>
+                  {r.liked && (
+                    <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                        Liked:
+                      </span>{" "}
+                      {r.liked}
+                    </p>
+                  )}
+                  {r.disliked && (
+                    <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">
+                      <span className="font-medium text-rose-600 dark:text-rose-400">
+                        Could be better:
+                      </span>{" "}
+                      {r.disliked}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
           <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
