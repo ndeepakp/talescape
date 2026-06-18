@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { Avatar } from "@/components/Avatar";
 import { StarRating } from "@/components/StarRating";
 import { ReviewPanel } from "@/components/ReviewPanel";
+import { PinReviewButton } from "@/components/PinReviewButton";
 import { CommentForm } from "@/components/CommentForm";
 import { DeleteStoryButton } from "@/components/DeleteStoryButton";
 import { AccessPanel } from "@/components/AccessPanel";
@@ -509,11 +510,16 @@ export default async function StoryPage({
                         <StarRating value={r.stars} size={14} />
                       </div>
                     </div>
-                    {r.pinned && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
-                        📌 Pinned by author
-                      </span>
-                    )}
+                    <div className="flex shrink-0 items-center gap-2">
+                      {r.pinned && (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-950/40 dark:text-amber-300">
+                          📌 Featured by author
+                        </span>
+                      )}
+                      {isAuthor && (
+                        <PinReviewButton reviewId={r.id} pinned={r.pinned} />
+                      )}
+                    </div>
                   </div>
                   {r.liked && (
                     <p className="mt-2 text-sm text-zinc-700 dark:text-zinc-300">
