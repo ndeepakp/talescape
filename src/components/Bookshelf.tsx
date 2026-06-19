@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookCover } from "@/components/BookCover";
 import { StarRating } from "@/components/StarRating";
 import { currencySymbol } from "@/lib/pricing";
+import { formatCount } from "@/lib/format";
 import { type CoverStyle } from "@/lib/cover-style";
 
 export type BookshelfStory = {
@@ -95,6 +96,10 @@ function DetailPane({
             <Link href={`/stories/${story.slug ?? story.id}/reviews`} className="mt-2 inline-block">
               <Rating s={story} size={13} />
             </Link>
+            <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
+              <span aria-hidden="true">👁</span>
+              {formatCount(story.views)} {story.views === 1 ? "read" : "reads"}
+            </p>
             <p className="mt-2 text-sm font-medium text-zinc-700 dark:text-zinc-300">
               {charges(story)}
             </p>
@@ -179,6 +184,10 @@ export function Bookshelf({ stories }: { stories: BookshelfStory[] }) {
               >
                 <Rating s={s} size={11} />
               </Link>
+              <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-zinc-400">
+                <span aria-hidden="true">👁</span>
+                {formatCount(s.views)} {s.views === 1 ? "read" : "reads"}
+              </p>
             </div>
           </div>
         ))}

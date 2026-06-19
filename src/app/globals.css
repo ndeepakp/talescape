@@ -162,9 +162,17 @@ body {
   transform-origin: right center;
   animation: pageFlipPrev 0.85s ease-in-out;
 }
+/* Gentle idle float for the landing-page hero card. */
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+.animate-floaty { animation: floaty 5s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .pageflip-next,
-  .pageflip-prev { animation: none; }
+  .pageflip-prev,
+  .animate-floaty { animation: none; }
 }
 
 /* Reader bookmark highlight (jumped-to text). */

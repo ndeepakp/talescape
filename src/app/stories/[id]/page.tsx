@@ -13,6 +13,7 @@ import { PostCard } from "@/components/PostCard";
 import { PostComposer } from "@/components/PostComposer";
 import { getStoryPosts } from "@/lib/posts";
 import { resolveStory, isUuid } from "@/lib/slug";
+import { formatCount } from "@/lib/format";
 import { DeleteStoryButton } from "@/components/DeleteStoryButton";
 import { AccessPanel } from "@/components/AccessPanel";
 import { ApprovedReadersList } from "@/components/ApprovedReadersList";
@@ -343,11 +344,11 @@ export default async function StoryPage({
           · {date}
         </p>
 
-        {/* View count — readers other than the author who have opened this story. */}
+        {/* Read count — readers other than the author who have opened this story. */}
         <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
           <span aria-hidden="true">👁</span>
           <span>
-            {views} {views === 1 ? "view" : "views"}
+            {formatCount(views)} {views === 1 ? "read" : "reads"}
           </span>
         </div>
 
