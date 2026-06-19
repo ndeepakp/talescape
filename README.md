@@ -29,6 +29,33 @@ Core ideas:
 - **The creator sets the price.** Pricing, durations and subscriptions are the
   author's to decide — not the platform's.
 
+### How TALEROOMS is different from Substack, Patreon & Wattpad
+
+There is adjacency with all three, but none occupy TALEROOMS' exact position:
+**paid-first, original serialized fiction with creator-set granular pricing,
+enforced originality, and an IP-marketplace ambition.**
+
+| Dimension | **TALEROOMS** | **Substack** | **Patreon** | **Wattpad** |
+|---|---|---|---|---|
+| **Core category** | Paid, original *serialized fiction* marketplace | Subscription publishing (newsletters/essays) | Membership/patronage for any creator | Free-first social fiction community |
+| **Primary content** | Chapter-by-chapter fiction | Long-form writing, mostly non-fiction | Anything (posts, art, video, audio) | Serialized fiction (much fan-fic/amateur) |
+| **Default price stance** | **Paid-first**, creator-priced | Free or paid newsletter | Paid membership tiers | **Free-first**, ads + optional coins |
+| **Payment granularity** | **Per-chapter, whole-story bundle, *and* subscription** | Subscription only | Monthly tier only | Platform "coins" per part; mostly free |
+| **Access flexibility** | **Hour / day / week / year / forever** | Ongoing sub | Ongoing sub | Unlock/own a part |
+| **Public pitch, gated body** | **Yes** — summary public, chapters gated by author rules | Some posts paywalled | Tier-gated posts | Mostly fully public |
+| **Originality enforcement** | **Similarity check at publish + author pledge** | None | None | None (derivative content common) |
+| **Discovery / social feed** | Genre feed, search, follows, reviews | Limited | Almost none — bring your own audience | **Very strong** (its core strength) |
+| **Reading experience** | Paginated reader, bookmarks, continue-reading, in-line word lookup, collections | Email/web article | Plain posts | Inline comments, votes, lists |
+| **Who owns the audience** | Creator (direct paying readers) | **Creator owns email list** | Creator owns patron list | Platform owns the relationship |
+| **IP / adaptation ambition** | **Originality-first IP marketplace** (studio licensing) | None | None | Adaptation arm — from amateur/free corpus |
+| **Audience skew** | Original-fiction readers willing to pay | Knowledge/newsletter readers | Fans of a specific creator | Huge, young, free-reading |
+
+**The wedge:** originality enforcement is the one promise the other three
+structurally cannot make — it's what turns the catalogue into licensable IP
+rather than a free fan-fiction pile. The real risk is not the concept but
+*distribution* — a two-sided marketplace must attract original writers **and**
+paying readers, which is the normal (and hardest) marketplace problem.
+
 ---
 
 ## 2. TALEROOMS for Content Creators

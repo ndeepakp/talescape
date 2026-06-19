@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
+import { DeleteStoryButton } from "@/components/DeleteStoryButton";
 
 export const dynamic = "force-dynamic";
 
@@ -57,25 +58,36 @@ export default async function DraftsPage() {
         ) : (
           <ul className="mt-6 flex flex-col gap-4">
             {drafts.map((d) => (
-              <li key={d.id}>
-                <Link
-                  href={`/stories/${d.id}/edit`}
-                  className="block rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-5 transition-colors hover:border-amber-400 dark:border-amber-900 dark:bg-amber-950/20"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
+              <li
+                key={d.id}
+                className="rounded-2xl border border-dashed border-amber-300 bg-amber-50/50 p-5 dark:border-amber-900 dark:bg-amber-950/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <Link href={`/stories/${d.id}/edit`} className="min-w-0">
+                    <h2 className="text-lg font-semibold text-zinc-900 hover:underline dark:text-zinc-50">
                       {d.title || "Untitled"}
                     </h2>
-                    <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
-                      {expiryLabel(d.draft_expires_at)}
-                    </span>
-                  </div>
-                  {d.summary && (
+                  </Link>
+                  <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                    {expiryLabel(d.draft_expires_at)}
+                  </span>
+                </div>
+                {d.summary && (
+                  <Link href={`/stories/${d.id}/edit`} className="block">
                     <p className="mt-2 line-clamp-3 text-zinc-700 dark:text-zinc-300">
                       {d.summary}
                     </p>
-                  )}
-                </Link>
+                  </Link>
+                )}
+                <div className="mt-3 flex items-center gap-4">
+                  <Link
+                    href={`/stories/${d.id}/edit`}
+                    className="text-sm font-medium text-amber-700 hover:underline dark:text-amber-300"
+                  >
+                    Continue editing
+                  </Link>
+                  <DeleteStoryButton storyId={d.id} />
+                </div>
               </li>
             ))}
           </ul>

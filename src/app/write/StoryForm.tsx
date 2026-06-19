@@ -109,6 +109,9 @@ export function StoryForm({
   const [currency, setCurrency] = useState<string>(story?.currency ?? DEFAULT_CURRENCY);
   const [coverUrl, setCoverUrl] = useState<string | null>(story?.coverUrl ?? null);
   const [coverUploading, setCoverUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  // Import failures are shown in a modal the writer must acknowledge.
+  const [importError, setImportError] = useState<string | null>(null);
   // New stories default to a generated cover (covers boost reach); editing keeps
   // whatever was saved. An uploaded image takes precedence over this.
   const [coverStyle, setCoverStyle] = useState<CoverStyle | null>(
@@ -137,12 +140,20 @@ export function StoryForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<null | "draft" | "publish">(null);
   const [matches, setMatches] = useState<Match[] | null>(null);
+  // Auto-save: the id of the draft row once it exists (so repeated saves update
+  // it instead of creating duplicates), and a status badge for the writer.
+  const [savedId, setSavedId] = useState<string | null>(story?.id ?? null);
+  const [autoStatus, setAutoStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const savingRef = useRef(false);
+  // Never silently auto-save a live, published story (it would re-run the
+  // similarity check and risk flipping its status) — only drafts/new stories.
+  const isPublished = isEdit && story?.status === "published";
 
   const titleWords = wordCount(title);
 
   // --- Unsaved-changes guard --------------------------------------------------
   // Snapshot the form's starting state once; anything different means "dirty".
-  const [initialSnapshot] = useState(() =>
+  const [savedSnapshot, setSavedSnapshot] = useState(() =>
     JSON.stringify({
       title: story?.title ?? "",
       summary: story?.summary ?? "",
@@ -175,7 +186,7 @@ export function StoryForm({
     offeredDurations,
     wholePrices: offerWhole ? wholePrices : {},
   });
-  const dirty = currentSnapshot !== initialSnapshot;
+  const dirty = currentSnapshot !== savedSnapshot;
 
   // Warn on reload / tab close / leaving the site with unsaved changes.
   useEffect(() => {
@@ -196,6 +207,71 @@ export function StoryForm({
     leavingRef.current = true;
     router.push(href);
   }
+  // ---------------------------------------------------------------------------
+
+  // --- Auto-save --------------------------------------------------------------
+  // A short moment after typing stops, persist the work-in-progress as a draft.
+  // The first save creates the draft (remembering its id); later saves update it
+  // so we never leave duplicates. Published stories are excluded.
+  async function saveDraftSilently(snapshot: string) {
+    if (savingRef.current || loading || matches || isPublished) return;
+    if (!title.trim()) return;
+    savingRef.current = true;
+    setAutoStatus("saving");
+    const offered = chaptersPublic ? [] : offeredDurations;
+    const payloadChapters = chapters.map((c) => ({
+      title: c.title.trim() ? c.title.trim() : null,
+      body: c.body,
+      prices: chaptersPublic ? {} : c.prices,
+      questions: c.questions,
+    }));
+    const targetId = savedId;
+    try {
+      const res = await fetch(targetId ? `/api/stories/${targetId}` : "/api/stories", {
+        method: targetId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          summary,
+          chapters: payloadChapters,
+          genreIds: selected,
+          accepted,
+          chaptersPublic,
+          offeredDurations: offered,
+          wholePrices: chaptersPublic || !offerWhole ? {} : wholePrices,
+          currency,
+          coverUrl,
+          coverStyle: coverUrl ? null : coverStyle,
+          status: "draft",
+        }),
+      });
+      if (!res.ok) {
+        setAutoStatus("error");
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (data.id && !savedId) setSavedId(data.id as string);
+      setSavedSnapshot(snapshot);
+      setAutoStatus("saved");
+    } catch {
+      setAutoStatus("error");
+    } finally {
+      savingRef.current = false;
+    }
+  }
+
+  // Latest-saver ref so the debounce effect doesn't re-subscribe each keystroke.
+  const saveRef = useRef(saveDraftSilently);
+  useEffect(() => {
+    saveRef.current = saveDraftSilently;
+  });
+
+  useEffect(() => {
+    if (!dirty || isPublished || !title.trim()) return;
+    const snap = currentSnapshot;
+    const t = setTimeout(() => saveRef.current(snap), 1500);
+    return () => clearTimeout(t);
+  }, [currentSnapshot, dirty, isPublished, title]);
   // ---------------------------------------------------------------------------
 
   function toggleGenre(id: number) {
@@ -230,6 +306,46 @@ export function StoryForm({
       ...prev,
       { id: newId(), title: "", body: "", prices: {}, questions: [] },
     ]);
+  }
+
+  // Upload a .docx and turn it into chapters. "replace" seeds a brand-new story
+  // (and its title); "append" adds the document's chapters to what's already
+  // here. Pricing is left empty so the author decides it after reviewing.
+  async function importDoc(file: File, mode: "replace" | "append") {
+    setImportError(null);
+    setImporting(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/import/docx", { method: "POST", body: fd });
+    setImporting(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setImportError(d.error ?? "Could not import that document.");
+      return;
+    }
+    const data = await res.json();
+    const imported: DraftChapter[] = (data.chapters ?? []).map(
+      (c: { title: string | null; body: string }) => ({
+        id: newId(),
+        title: c.title ?? "",
+        body: c.body ?? "",
+        prices: {},
+        questions: [],
+      }),
+    );
+    if (imported.length === 0) {
+      setImportError("No readable content was found in that document.");
+      return;
+    }
+    if (mode === "replace") {
+      if (!title.trim() && typeof data.title === "string") setTitle(data.title);
+      if (!summary.trim() && typeof data.summary === "string" && data.summary) {
+        setSummary(data.summary);
+      }
+      setChapters(imported);
+    } else {
+      setChapters((prev) => [...prev, ...imported]);
+    }
   }
 
   function toggleTier(tier: Tier) {
@@ -278,8 +394,11 @@ export function StoryForm({
       }
     }
     setLoading(draft ? "draft" : "publish");
-    const res = await fetch(isEdit ? `/api/stories/${story!.id}` : "/api/stories", {
-      method: isEdit ? "PUT" : "POST",
+    // Reuse the draft auto-save created (if any) so we update it rather than
+    // creating a second story.
+    const targetId = savedId ?? (isEdit ? story!.id : null);
+    const res = await fetch(targetId ? `/api/stories/${targetId}` : "/api/stories", {
+      method: targetId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title,
@@ -311,11 +430,13 @@ export function StoryForm({
       return;
     }
     const data = await res.json().catch(() => ({}));
+    const finalId = (data.id as string | undefined) ?? targetId ?? story?.id ?? null;
+    if (!savedId && finalId) setSavedId(finalId);
     leavingRef.current = true;
     // Drafts go back to where the author can find them again (their profile);
     // published stories go to the story (edit) or the feed (new).
     if (draft) {
-      router.push(isEdit ? `/stories/${story!.id}/edit` : `/stories/${data.id}/edit`);
+      router.push(`/stories/${finalId}/edit`);
     } else {
       router.push(isEdit ? `/stories/${story!.id}` : "/feed");
     }
@@ -392,6 +513,41 @@ export function StoryForm({
 
   return (
     <div className="min-h-screen bg-[var(--page)] px-6 py-12">
+      {/* Import-error popup — blocks until the writer acknowledges it. */}
+      {importError && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setImportError(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl dark:bg-zinc-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xl" aria-hidden="true">
+                ⚠️
+              </span>
+              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-50">
+                Couldn’t import the document
+              </h2>
+            </div>
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">{importError}</p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setImportError(null)}
+                className="rounded-full btn-primary px-5 py-2 text-sm font-medium"
+                autoFocus
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-5xl">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">
@@ -413,6 +569,63 @@ export function StoryForm({
           }}
           className="mt-8 flex flex-col gap-6"
         >
+          {/* 0. Import from a document (only when nothing's written yet) */}
+          {chapters.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-accent/60 bg-accent/5 p-4">
+              <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
+                📄 Already wrote it in Word?
+              </p>
+              <p className="mt-0.5 text-xs text-zinc-500">
+                Upload a <strong>.docx</strong> and we’ll turn it into chapters
+                automatically — you review everything and set pricing before
+                publishing.
+              </p>
+              <ul className="mt-2 ml-4 list-disc space-y-0.5 text-xs text-zinc-500">
+                <li>
+                  The <strong>file’s name</strong> becomes your story’s title
+                  (max {MAX_TITLE_WORDS} words).
+                </li>
+                <li>
+                  Any text <strong>before your first Heading&nbsp;1</strong> becomes
+                  the story summary (max {MAX_SUMMARY_WORDS} words; otherwise we
+                  draft one from your opening lines).
+                </li>
+                <li>
+                  Start each chapter with a <strong>Heading&nbsp;1</strong> — its
+                  text becomes the chapter title.
+                </li>
+                <li>
+                  Everything under a heading (paragraphs, <strong>bold</strong>,{" "}
+                  <em>italics</em>, lists) becomes that chapter’s body.
+                </li>
+                <li>No headings? It comes in as a single chapter.</li>
+              </ul>
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-full btn-primary px-4 py-2 text-sm font-medium">
+                  {importing ? "Importing…" : "Import from document"}
+                  <input
+                    type="file"
+                    accept=".docx"
+                    className="hidden"
+                    disabled={importing}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) importDoc(f, "replace");
+                    }}
+                  />
+                </label>
+                <a
+                  href="/talerooms-example-story.docx"
+                  download
+                  className="text-sm font-medium text-accent hover:underline"
+                >
+                  ⬇ Download an example
+                </a>
+              </div>
+            </div>
+          )}
+
           {/* 1. Title */}
           <label className="flex flex-col gap-1.5">
             <span className="flex items-center justify-between text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -800,13 +1013,29 @@ export function StoryForm({
               </div>
             ))}
 
-            <button
-              type="button"
-              onClick={addChapter}
-              className="self-start rounded-full border border-accent px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
-            >
-              + Add chapter
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={addChapter}
+                className="rounded-full border border-accent px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/10"
+              >
+                + Add chapter
+              </button>
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-accent px-4 py-2 text-sm font-medium text-accent transition-colors hover:bg-accent/10">
+                {importing ? "Importing…" : "+ Add chapter from .docx"}
+                <input
+                  type="file"
+                  accept=".docx"
+                  className="hidden"
+                  disabled={importing}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) importDoc(f, "append");
+                  }}
+                />
+              </label>
+            </div>
           </div>
 
           {/* 4. Genres */}
@@ -848,6 +1077,16 @@ export function StoryForm({
           </label>
 
           {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {!isPublished && autoStatus !== "idle" && (
+            <p className="text-right text-xs text-zinc-400">
+              {autoStatus === "saving"
+                ? "Saving…"
+                : autoStatus === "saved"
+                  ? "Draft saved automatically ✓"
+                  : "Couldn’t auto-save — use “Save as draft” to be safe."}
+            </p>
+          )}
 
           <div className="flex flex-col gap-3 sm:flex-row-reverse">
             <button
