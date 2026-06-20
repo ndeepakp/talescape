@@ -29,9 +29,15 @@ export default async function DraftsPage() {
   `;
 
   const drafts = await sql<
-    { id: string; title: string; summary: string; draft_expires_at: string | null }[]
+    {
+      id: string;
+      title: string;
+      summary: string;
+      draft_expires_at: string | null;
+      draft_of: string | null;
+    }[]
   >`
-    SELECT id, title, summary, draft_expires_at
+    SELECT id, title, summary, draft_expires_at, draft_of
     FROM stories
     WHERE author_id = ${me} AND status = 'draft'
     ORDER BY created_at DESC
@@ -72,6 +78,11 @@ export default async function DraftsPage() {
                     {expiryLabel(d.draft_expires_at)}
                   </span>
                 </div>
+                {d.draft_of && (
+                  <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    ✏️ Unpublished edits — your published version stays live
+                  </p>
+                )}
                 {d.summary && (
                   <Link href={`/stories/${d.id}/edit`} className="block">
                     <p className="mt-2 line-clamp-3 text-zinc-700 dark:text-zinc-300">

@@ -33,16 +33,30 @@ export default async function EditStoryPage({
       cover_url: string | null;
       cover_style: CoverStyle | null;
       author_id: string;
+      draft_of: string | null;
     }[]
   >`
     SELECT id, title, summary, chapters, status, chapters_public,
-           offered_durations, whole_prices, currency, cover_url, cover_style, author_id
+           offered_durations, whole_prices, currency, cover_url, cover_style,
+           author_id, draft_of
     FROM stories WHERE id = ${id}
   `;
 
   if (!story) notFound();
   // Only the author may edit; everyone else is bounced to the story page.
   if (story.author_id !== session.user.id) redirect(`/stories/${id}`);
+
+  // A published story is edited through a separate "working copy" draft so it
+  // never leaves the shelf. If one already exists, resume it; otherwise the
+  // form creates it on first save. A working copy publishes back to its origin.
+  let originId: string | null = story.draft_of;
+  if (story.status === "published") {
+    const [wip] = await sql<{ id: string }[]>`
+      SELECT id FROM stories WHERE draft_of = ${id} AND author_id = ${session.user.id}
+    `;
+    if (wip) redirect(`/stories/${wip.id}/edit`);
+    originId = id; // edit the live story; a working copy is created on save
+  }
 
   const genreRows = await sql<{ genre_id: number }[]>`
     SELECT genre_id FROM story_genres WHERE story_id = ${id}
@@ -68,6 +82,7 @@ export default async function EditStoryPage({
         currency: story.currency,
         coverUrl: story.cover_url,
         coverStyle: story.cover_style,
+        originId,
       }}
     />
   );

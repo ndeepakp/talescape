@@ -5,19 +5,53 @@ import { cleanSnippet, extractMentions, extractStoryMentions } from "@/lib/menti
 import { notify } from "@/lib/notify";
 
 const MAX_BODY = 2000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Create a community post. Only @mentioned users are notified.
+// Create a community post. Mentions notify @users + story authors; an "answer"
+// post (a reader answering a chapter's discussion prompt) is tagged with the
+// story/chapter and notifies the story's author.
 export const POST = withErrors(async (req: Request) => {
   const session = await requireSession();
-  const raw = (await req.json().catch(() => ({}))).body;
-  const text = typeof raw === "string" ? raw.trim() : "";
+  const payload = await req.json().catch(() => ({}));
+  const text = typeof payload.body === "string" ? payload.body.trim() : "";
   if (!text) throw new ApiError(400, "Write something to post.");
   if (text.length > MAX_BODY) throw new ApiError(400, "That post is too long.");
 
+  // Optional "answering a chapter prompt" context.
+  const answerStoryId =
+    typeof payload.answerStoryId === "string" && UUID_RE.test(payload.answerStoryId)
+      ? payload.answerStoryId
+      : null;
+  const answerChapter =
+    answerStoryId && Number.isInteger(payload.answerChapter) && payload.answerChapter >= 0
+      ? (payload.answerChapter as number)
+      : null;
+  const answerPrompt =
+    answerStoryId && typeof payload.answerPrompt === "string"
+      ? payload.answerPrompt.trim().slice(0, 280) || null
+      : null;
+
   const [post] = await sql<{ id: string }[]>`
-    INSERT INTO posts (author_id, body) VALUES (${session.user.id}, ${text})
+    INSERT INTO posts (author_id, body, answer_story_id, answer_chapter, answer_prompt)
+    VALUES (${session.user.id}, ${text}, ${answerStoryId}, ${answerChapter}, ${answerPrompt})
     RETURNING id
   `;
+
+  // Answer to a chapter prompt → notify the story's author.
+  if (answerStoryId) {
+    const [s] = await sql<{ author_id: string }[]>`
+      SELECT author_id FROM stories WHERE id = ${answerStoryId}
+    `;
+    if (s) {
+      await notify({
+        userId: s.author_id,
+        kind: "prompt_answer",
+        actorId: session.user.id,
+        storyId: answerStoryId,
+        data: { post_id: post.id, snippet: cleanSnippet(text), chapter: answerChapter ?? 0 },
+      });
+    }
+  }
 
   const handles = extractMentions(text);
   if (handles.length > 0) {

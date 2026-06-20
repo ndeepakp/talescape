@@ -23,6 +23,7 @@ import {
 } from "@/lib/pricing";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { ChapterQuestionsEditor } from "@/components/ChapterQuestionsEditor";
+import { ChapterPromptsEditor } from "@/components/ChapterPromptsEditor";
 import { BookCover } from "@/components/BookCover";
 import { COVER_PALETTES, type CoverStyle } from "@/lib/cover-style";
 
@@ -44,6 +45,9 @@ type EditStory = {
   currency: string;
   coverUrl: string | null;
   coverStyle: CoverStyle | null;
+  // The live published story this edit publishes back to. Set both when editing
+  // a published story directly and when editing its working-copy draft.
+  originId?: string | null;
 };
 
 // Local chapter shape: a stable id (so reordering keeps each editor's content
@@ -55,6 +59,7 @@ type DraftChapter = {
   body: string;
   prices: PriceMap;
   questions: Question[];
+  prompts: string[];
 };
 
 const ORIGINALITY_NOTE =
@@ -74,6 +79,7 @@ function toDrafts(chapters: Chapter[]): DraftChapter[] {
     body: c.body,
     prices: { ...(c.prices ?? {}) },
     questions: c.questions ?? [],
+    prompts: c.prompts ?? [],
   }));
 }
 
@@ -140,14 +146,29 @@ export function StoryForm({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<null | "draft" | "publish">(null);
   const [matches, setMatches] = useState<Match[] | null>(null);
-  // Auto-save: the id of the draft row once it exists (so repeated saves update
-  // it instead of creating duplicates), and a status badge for the writer.
-  const [savedId, setSavedId] = useState<string | null>(story?.id ?? null);
   const [autoStatus, setAutoStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const savingRef = useRef(false);
-  // Never silently auto-save a live, published story (it would re-run the
-  // similarity check and risk flipping its status) — only drafts/new stories.
-  const isPublished = isEdit && story?.status === "published";
+
+  // --- Save targets ----------------------------------------------------------
+  // Editing a published story (directly or via its working-copy draft) keeps the
+  // live story on the shelf: draft saves go to a separate working copy, and only
+  // "publish" writes the live story.
+  const originId = story?.originId ?? null;
+  const publishedEdit = !!originId;
+  // Where "publish / save changes" writes (the live story for published edits;
+  // the row itself for a plain draft; a new row for a new story).
+  const publishId = publishedEdit ? originId : isEdit ? story!.id : null;
+  // Where draft saves write. A published story with no working copy yet starts
+  // null — one is created lazily on the first save.
+  const [draftId, setDraftId] = useState<string | null>(
+    publishedEdit
+      ? story!.status === "draft"
+        ? story!.id // already editing the working copy
+        : null // live story, no copy yet
+      : isEdit
+        ? story!.id // plain draft edits in place
+        : null, // new story
+  );
 
   const titleWords = wordCount(title);
 
@@ -162,6 +183,7 @@ export function StoryForm({
         body: c.body,
         prices: c.prices ?? {},
         questions: c.questions ?? [],
+        prompts: c.prompts ?? [],
       })),
       selected: story?.genreIds ?? [],
       chaptersPublic: story?.chaptersPublic ?? false,
@@ -180,6 +202,7 @@ export function StoryForm({
       body: c.body,
       prices: c.prices,
       questions: c.questions,
+      prompts: c.prompts,
     })),
     selected,
     chaptersPublic,
@@ -214,7 +237,7 @@ export function StoryForm({
   // The first save creates the draft (remembering its id); later saves update it
   // so we never leave duplicates. Published stories are excluded.
   async function saveDraftSilently(snapshot: string) {
-    if (savingRef.current || loading || matches || isPublished) return;
+    if (savingRef.current || loading || matches) return;
     if (!title.trim()) return;
     savingRef.current = true;
     setAutoStatus("saving");
@@ -224,8 +247,9 @@ export function StoryForm({
       body: c.body,
       prices: chaptersPublic ? {} : c.prices,
       questions: c.questions,
+      prompts: c.prompts,
     }));
-    const targetId = savedId;
+    const targetId = draftId;
     try {
       const res = await fetch(targetId ? `/api/stories/${targetId}` : "/api/stories", {
         method: targetId ? "PUT" : "POST",
@@ -243,6 +267,8 @@ export function StoryForm({
           coverUrl,
           coverStyle: coverUrl ? null : coverStyle,
           status: "draft",
+          // Creating the working copy of a published story.
+          ...(!targetId && publishedEdit ? { draftOf: publishId } : {}),
         }),
       });
       if (!res.ok) {
@@ -250,7 +276,7 @@ export function StoryForm({
         return;
       }
       const data = await res.json().catch(() => ({}));
-      if (data.id && !savedId) setSavedId(data.id as string);
+      if (data.id && !draftId) setDraftId(data.id as string);
       setSavedSnapshot(snapshot);
       setAutoStatus("saved");
     } catch {
@@ -267,11 +293,11 @@ export function StoryForm({
   });
 
   useEffect(() => {
-    if (!dirty || isPublished || !title.trim()) return;
+    if (!dirty || !title.trim()) return;
     const snap = currentSnapshot;
     const t = setTimeout(() => saveRef.current(snap), 1500);
     return () => clearTimeout(t);
-  }, [currentSnapshot, dirty, isPublished, title]);
+  }, [currentSnapshot, dirty, title]);
   // ---------------------------------------------------------------------------
 
   function toggleGenre(id: number) {
@@ -304,7 +330,7 @@ export function StoryForm({
   function addChapter() {
     setChapters((prev) => [
       ...prev,
-      { id: newId(), title: "", body: "", prices: {}, questions: [] },
+      { id: newId(), title: "", body: "", prices: {}, questions: [], prompts: [] },
     ]);
   }
 
@@ -325,12 +351,18 @@ export function StoryForm({
     }
     const data = await res.json();
     const imported: DraftChapter[] = (data.chapters ?? []).map(
-      (c: { title: string | null; body: string; questions?: Question[] }) => ({
+      (c: {
+        title: string | null;
+        body: string;
+        questions?: Question[];
+        prompts?: string[];
+      }) => ({
         id: newId(),
         title: c.title ?? "",
         body: c.body ?? "",
         prices: {},
         questions: Array.isArray(c.questions) ? c.questions : [],
+        prompts: Array.isArray(c.prompts) ? c.prompts : [],
       }),
     );
     if (imported.length === 0) {
@@ -382,6 +414,7 @@ export function StoryForm({
       body: c.body,
       prices: chaptersPublic ? {} : c.prices,
       questions: c.questions,
+      prompts: c.prompts,
     }));
     // Skip re-validating when resolving a similarity prompt — already validated.
     if (!opts.decision) {
@@ -394,9 +427,9 @@ export function StoryForm({
       }
     }
     setLoading(draft ? "draft" : "publish");
-    // Reuse the draft auto-save created (if any) so we update it rather than
-    // creating a second story.
-    const targetId = savedId ?? (isEdit ? story!.id : null);
+    // Drafts write the working copy (created lazily); publishing writes the live
+    // story (publishId) — which keeps a published story on the shelf.
+    const targetId = draft ? draftId : (publishId ?? draftId);
     const res = await fetch(targetId ? `/api/stories/${targetId}` : "/api/stories", {
       method: targetId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
@@ -415,6 +448,7 @@ export function StoryForm({
         status: draft ? "draft" : "published",
         decision: opts.decision,
         inspiredById: opts.inspiredById,
+        ...(draft && !targetId && publishedEdit ? { draftOf: publishId } : {}),
       }),
     });
     setLoading(null);
@@ -430,15 +464,24 @@ export function StoryForm({
       return;
     }
     const data = await res.json().catch(() => ({}));
-    const finalId = (data.id as string | undefined) ?? targetId ?? story?.id ?? null;
-    if (!savedId && finalId) setSavedId(finalId);
+    const finalId = (data.id as string | undefined) ?? targetId ?? null;
     leavingRef.current = true;
-    // Drafts go back to where the author can find them again (their profile);
-    // published stories go to the story (edit) or the feed (new).
     if (draft) {
+      if (finalId && !draftId) setDraftId(finalId);
+      // Stay editing the (working-copy) draft; the live story keeps its place.
       router.push(`/stories/${finalId}/edit`);
     } else {
-      router.push(isEdit ? `/stories/${story!.id}` : "/feed");
+      // Published a live story's edit — discard its working copy if any.
+      if (publishedEdit && draftId && draftId !== finalId) {
+        await fetch(`/api/stories/${draftId}`, { method: "DELETE" }).catch(() => {});
+      }
+      router.push(
+        publishedEdit
+          ? `/stories/${publishId}`
+          : isEdit
+            ? `/stories/${story!.id}`
+            : "/feed",
+      );
     }
     router.refresh();
   }
@@ -569,46 +612,61 @@ export function StoryForm({
           }}
           className="mt-8 flex flex-col gap-6"
         >
-          {/* 0. Import from a document (only when nothing's written yet) */}
-          {chapters.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-accent/60 bg-accent/5 p-4">
+          {/* 0. Import from a Word document — always available */}
+          <div className="rounded-2xl border border-dashed border-accent/60 bg-accent/5 p-4">
               <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">
                 📄 Already wrote it in Word?
               </p>
               <p className="mt-0.5 text-xs text-zinc-500">
                 Upload a <strong>.docx</strong> and we’ll turn it into chapters
-                automatically — you review everything and set pricing before
-                publishing.
+                automatically.{" "}
+                {chapters.length === 0
+                  ? "You review everything and set pricing before publishing."
+                  : "Its chapters get added to what you already have."}
               </p>
-              <ul className="mt-2 ml-4 list-disc space-y-0.5 text-xs text-zinc-500">
-                <li>
-                  The <strong>file’s name</strong> becomes your story’s title
-                  (max {MAX_TITLE_WORDS} words).
-                </li>
-                <li>
-                  Any text <strong>before your first Heading&nbsp;1</strong> becomes
-                  the story summary (max {MAX_SUMMARY_WORDS} words; otherwise we
-                  draft one from your opening lines).
-                </li>
-                <li>
-                  Start each chapter with a <strong>Heading&nbsp;1</strong> — its
-                  text becomes the chapter title.
-                </li>
-                <li>
-                  Everything under a heading (paragraphs, <strong>bold</strong>,{" "}
-                  <em>italics</em>, lists) becomes that chapter’s body.
-                </li>
-                <li>
-                  Want reader <strong>Q&amp;A</strong>? End a chapter with a{" "}
-                  <strong>Heading 2</strong> called “Q&amp;A”, then one question
-                  per line — add a bulleted list under a question for
-                  multiple-choice.
-                </li>
-                <li>No headings? It comes in as a single chapter.</li>
-              </ul>
+              <details className="group mt-2">
+                <summary className="cursor-pointer select-none text-xs font-semibold text-accent hover:underline">
+                  How to format your document
+                </summary>
+                <ul className="mt-2 ml-4 list-disc space-y-0.5 text-xs text-zinc-500">
+                  <li>
+                    The <strong>file’s name</strong> becomes your story’s title
+                    (max {MAX_TITLE_WORDS} words).
+                  </li>
+                  <li>
+                    Any text <strong>before your first Heading&nbsp;1</strong>{" "}
+                    becomes the story summary (max {MAX_SUMMARY_WORDS} words;
+                    otherwise we draft one from your opening lines).
+                  </li>
+                  <li>
+                    Start each chapter with a <strong>Heading&nbsp;1</strong> — its
+                    text becomes the chapter title.
+                  </li>
+                  <li>
+                    Everything under a heading (paragraphs, <strong>bold</strong>,{" "}
+                    <em>italics</em>, lists) becomes that chapter’s body.
+                  </li>
+                  <li>
+                    Want a <strong>chapter quiz</strong>? End a chapter with a{" "}
+                    <strong>Heading 2</strong> called “Quiz”, then each question on
+                    its own line followed by a bulleted list of options —{" "}
+                    <strong>bold the correct option</strong>.
+                  </li>
+                  <li>
+                    Want <strong>discussion prompts</strong>? Add a{" "}
+                    <strong>Heading 2</strong> called “Discuss”, then one open
+                    question per line — a reader’s answer becomes a public post.
+                  </li>
+                  <li>No headings? It comes in as a single chapter.</li>
+                </ul>
+              </details>
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-full btn-primary px-4 py-2 text-sm font-medium">
-                  {importing ? "Importing…" : "Import from document"}
+                  {importing
+                    ? "Importing…"
+                    : chapters.length === 0
+                      ? "Import from document"
+                      : "Add chapters from document"}
                   <input
                     type="file"
                     accept=".docx"
@@ -617,7 +675,7 @@ export function StoryForm({
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       e.target.value = "";
-                      if (f) importDoc(f, "replace");
+                      if (f) importDoc(f, chapters.length === 0 ? "replace" : "append");
                     }}
                   />
                 </label>
@@ -629,8 +687,7 @@ export function StoryForm({
                   ⬇ Download an example
                 </a>
               </div>
-            </div>
-          )}
+          </div>
 
           {/* 1. Title */}
           <label className="flex flex-col gap-1.5">
@@ -1016,6 +1073,10 @@ export function StoryForm({
                   questions={chapter.questions}
                   onChange={(q) => updateChapter(chapter.id, { questions: q })}
                 />
+                <ChapterPromptsEditor
+                  prompts={chapter.prompts}
+                  onChange={(p) => updateChapter(chapter.id, { prompts: p })}
+                />
               </div>
             ))}
 
@@ -1084,12 +1145,14 @@ export function StoryForm({
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 
-          {!isPublished && autoStatus !== "idle" && (
+          {autoStatus !== "idle" && (
             <p className="text-right text-xs text-zinc-400">
               {autoStatus === "saving"
                 ? "Saving…"
                 : autoStatus === "saved"
-                  ? "Draft saved automatically ✓"
+                  ? publishedEdit
+                    ? "Draft of your published story saved ✓"
+                    : "Draft saved automatically ✓"
                   : "Couldn’t auto-save — use “Save as draft” to be safe."}
             </p>
           )}
@@ -1102,8 +1165,8 @@ export function StoryForm({
             >
               {loading === "publish"
                 ? "Checking…"
-                : isEdit && story?.status === "published"
-                  ? "Save changes"
+                : publishedEdit
+                  ? "Publish changes"
                   : "Publish story"}
             </button>
             <button

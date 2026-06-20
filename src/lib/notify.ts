@@ -11,7 +11,8 @@ export type NotificationKind =
   | "story_mention"
   | "post_like"
   | "post_comment"
-  | "review";
+  | "review"
+  | "prompt_answer";
 
 // Records a notification for `userId` (the recipient). Skips self-notifications
 // (e.g. liking your own post). Never throws into the caller's flow — a

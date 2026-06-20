@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAPTER_PAGE_WORDS, wordCount } from "@/lib/story-validation";
 import { ChapterQuestions } from "@/components/ChapterQuestions";
+import { ChapterPrompts } from "@/components/ChapterPrompts";
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, " ");
@@ -69,6 +70,7 @@ export type ReaderChapter = {
   title: string | null;
   body: string | null; // null when locked
   locked: boolean;
+  prompts: string[]; // open discussion prompts ([] when locked)
 };
 export type Bookmark = {
   id: string;
@@ -534,6 +536,11 @@ export function ChapterReader({
             )}
 
             <ChapterQuestions storyId={storyId} chapterIndex={current} />
+            <ChapterPrompts
+              storyId={storyId}
+              chapterIndex={current}
+              prompts={chapter.prompts}
+            />
           </>
         )}
 

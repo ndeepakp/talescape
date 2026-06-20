@@ -34,48 +34,23 @@ export const GET = withErrors(async (
   if (questions.length === 0) return NextResponse.json({ questions: [] });
 
   const qids = questions.map((q) => q.id);
-  const answers = await sql<{
-    question_id: string;
-    user_id: string;
-    choice: number | null;
-    answer: string | null;
-    author: string | null;
-    handle: string | null;
-  }[]>`
-    SELECT a.question_id, a.user_id, a.choice, a.answer,
-           u.name AS author, u.username AS handle
-    FROM question_answers a JOIN "user" u ON u.id = a.user_id
-    WHERE a.question_id = ANY(${qids})
-    ORDER BY a.created_at
+  // Only the viewer's own answers — the correct answer is revealed per question
+  // once they've answered it (so it can't be peeked from the response first).
+  const mineRows = await sql<{ question_id: string; choice: number | null }[]>`
+    SELECT question_id, choice FROM question_answers
+    WHERE story_id = ${id} AND user_id = ${session.user.id}
+      AND question_id = ANY(${qids})
   `;
+  const myChoiceFor = new Map(mineRows.map((r) => [r.question_id, r.choice]));
 
   const out = questions.map((q) => {
-    const qa = answers.filter((a) => a.question_id === q.id);
-    const mine = qa.find((a) => a.user_id === session.user.id) ?? null;
-    if (q.type === "mcq") {
-      return {
-        id: q.id,
-        type: "mcq" as const,
-        prompt: q.prompt,
-        options: q.options,
-        counts: q.options.map((_, i) => qa.filter((a) => a.choice === i).length),
-        total: qa.length,
-        myChoice: mine?.choice ?? null,
-      };
-    }
+    const myChoice = myChoiceFor.get(q.id) ?? null;
     return {
       id: q.id,
-      type: "open" as const,
       prompt: q.prompt,
-      answers: qa
-        .filter((a) => a.answer)
-        .map((a) => ({
-          answer: a.answer as string,
-          author: a.author,
-          handle: a.handle,
-          mine: a.user_id === session.user.id,
-        })),
-      myAnswer: mine?.answer ?? null,
+      options: q.options,
+      myChoice,
+      correct: myChoice !== null ? q.answer : null,
     };
   });
 
@@ -100,23 +75,17 @@ export const POST = withErrors(async (
   const q = (await chapterQuestions(id, chapterIndex)).find((x) => x.id === questionId);
   if (!q) throw new ApiError(404, "Question not found.");
 
-  let choice: number | null = null;
-  let answer: string | null = null;
-  if (q.type === "mcq") {
-    choice = Number(body.choice);
-    if (!Number.isInteger(choice) || choice < 0 || choice >= q.options.length) {
-      throw new ApiError(400, "Pick a valid option.");
-    }
-  } else {
-    answer = typeof body.answer === "string" ? body.answer.trim().slice(0, 1000) : "";
-    if (!answer) throw new ApiError(400, "Write an answer.");
+  const choice = Number(body.choice);
+  if (!Number.isInteger(choice) || choice < 0 || choice >= q.options.length) {
+    throw new ApiError(400, "Pick a valid option.");
   }
 
   await sql`
     INSERT INTO question_answers (story_id, chapter_index, question_id, user_id, choice, answer)
-    VALUES (${id}, ${chapterIndex}, ${questionId}, ${session.user.id}, ${choice}, ${answer})
+    VALUES (${id}, ${chapterIndex}, ${questionId}, ${session.user.id}, ${choice}, NULL)
     ON CONFLICT (question_id, user_id)
-      DO UPDATE SET choice = ${choice}, answer = ${answer}, updated_at = now()
+      DO UPDATE SET choice = ${choice}, answer = NULL, updated_at = now()
   `;
-  return NextResponse.json({ ok: true });
+  // Whether the reader got it right — drives the instant ✓/✗ feedback.
+  return NextResponse.json({ ok: true, correct: choice === q.answer });
 });

@@ -425,6 +425,9 @@ export default async function StoryPage({
                   ? Buffer.from(c.body, "utf8").toString("base64")
                   : null,
                 locked: !chapterUnlocked(i),
+                prompts: chapterUnlocked(i)
+                  ? ((c as { prompts?: string[] }).prompts ?? [])
+                  : [],
               }))}
               initialChapter={initialChapter}
               initialPage={initialPage}

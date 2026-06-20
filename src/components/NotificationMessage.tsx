@@ -14,7 +14,8 @@ export type Notification = {
     | "story_mention"
     | "post_like"
     | "post_comment"
-    | "review";
+    | "review"
+    | "prompt_answer";
   actor_id: string | null;
   actor_name: string | null;
   actor_handle: string | null;
@@ -151,6 +152,14 @@ export function NotificationMessage({ n }: { n: Notification }) {
         <>
           <Actor n={n} /> rated <Story n={n} />
           {typeof d.stars === "number" ? ` ${d.stars}★` : ""}.
+        </>
+      );
+    case "prompt_answer":
+      return (
+        <>
+          <Actor n={n} /> answered your question on <Story n={n} /> in{" "}
+          <PostLink id={d.post_id} label="a post" />
+          {d.snippet ? `: “${d.snippet}”` : ""}.
         </>
       );
     case "sub_expiring":

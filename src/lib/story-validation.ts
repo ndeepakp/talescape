@@ -6,13 +6,14 @@ export const MAX_SUMMARY_WORDS = 150;
 // Shared by the reader (ChapterReader) and the write form's hint.
 export const CHAPTER_PAGE_WORDS = 750;
 
-// An engagement question shown after a chapter. `mcq` carries 2+ options;
-// `open` is free-text. `id` is stable (client-generated) so answers survive edits.
+// A graded quiz question shown after a chapter: a prompt, 2–8 options, and the
+// index of the correct option. `id` is stable (client-generated) so a reader's
+// answer survives edits.
 export type Question = {
   id: string;
-  type: "mcq" | "open";
   prompt: string;
-  options: string[]; // [] for open questions
+  options: string[];
+  answer: number; // index into options of the correct answer
 };
 
 // A single chapter the author writes. The title is optional; the body is rich
@@ -22,15 +23,29 @@ export type Chapter = {
   title: string | null;
   body: string;
   prices: Partial<Record<Tier, number>>;
-  questions: Question[];
+  questions: Question[]; // graded multiple-choice quiz
+  prompts: string[]; // open discussion prompts (a reader's answer becomes a post)
 };
+
+export const MAX_PROMPTS = 5;
+
+// Clean an untrusted prompts array: trim, drop blanks, cap count and length.
+export function normalizePrompts(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .filter((p): p is string => typeof p === "string")
+    .map((p) => p.trim().slice(0, 280))
+    .filter(Boolean)
+    .slice(0, MAX_PROMPTS);
+}
 
 function newQuestionId(): string {
   return `q-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 // Cleans an untrusted questions array: trims prompts (drops empty), keeps stable
-// ids, and requires MCQs to have at least two non-empty options.
+// ids, requires 2+ non-empty options, and clamps the correct-answer index into
+// range. Questions without enough options are dropped (can't be a quiz).
 export function normalizeQuestions(input: unknown): Question[] {
   if (!Array.isArray(input)) return [];
   const out: Question[] = [];
@@ -38,24 +53,22 @@ export function normalizeQuestions(input: unknown): Question[] {
     if (!raw || typeof raw !== "object") continue;
     const r = raw as {
       id?: unknown;
-      type?: unknown;
       prompt?: unknown;
       options?: unknown;
+      answer?: unknown;
     };
     const prompt = typeof r.prompt === "string" ? r.prompt.trim() : "";
     if (!prompt) continue;
-    const type = r.type === "mcq" ? "mcq" : "open";
     const id = typeof r.id === "string" && r.id ? r.id : newQuestionId();
-    let options: string[] = [];
-    if (type === "mcq") {
-      options = (Array.isArray(r.options) ? r.options : [])
-        .filter((o): o is string => typeof o === "string")
-        .map((o) => o.trim())
-        .filter(Boolean)
-        .slice(0, 8);
-      if (options.length < 2) continue; // an MCQ needs at least two options
-    }
-    out.push({ id, type, prompt: prompt.slice(0, 500), options });
+    const options = (Array.isArray(r.options) ? r.options : [])
+      .filter((o): o is string => typeof o === "string")
+      .map((o) => o.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    if (options.length < 2) continue; // a quiz question needs at least two options
+    let answer = Number.isInteger(r.answer) ? (r.answer as number) : 0;
+    if (answer < 0 || answer >= options.length) answer = 0;
+    out.push({ id, prompt: prompt.slice(0, 500), options, answer });
   }
   return out;
 }
@@ -98,6 +111,7 @@ export function normalizeChapters(
       body?: unknown;
       prices?: unknown;
       questions?: unknown;
+      prompts?: unknown;
     };
     const bodyHtml = typeof r.body === "string" ? r.body : "";
     if (!htmlToText(bodyHtml)) continue; // skip empty chapters
@@ -107,6 +121,7 @@ export function normalizeChapters(
       body: bodyHtml.trim(),
       prices: normalizePrices(r.prices, offered),
       questions: normalizeQuestions(r.questions),
+      prompts: normalizePrompts(r.prompts),
     });
   }
   return out;

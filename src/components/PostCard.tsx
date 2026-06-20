@@ -36,6 +36,8 @@ export function PostCard({ post }: { post: PostRow }) {
   const [commentCount, setCommentCount] = useState(post.comment_count);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // Answer posts are veiled (possible spoilers) until revealed — except your own.
+  const [revealed, setRevealed] = useState(post.mine);
 
   async function toggleLike() {
     const next = !liked;
@@ -109,9 +111,41 @@ export function PostCard({ post }: { post: PostRow }) {
         )}
       </div>
 
-      <div className="mt-3">
-        <PostBody text={post.body} />
-      </div>
+      {post.answer_prompt ? (
+        <div className="mt-3">
+          <p className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-medium text-accent">
+            <span aria-hidden="true">💬</span>
+            Answering: “{post.answer_prompt}”
+          </p>
+          {post.answer_story_id && (
+            <Link
+              href={`/stories/${post.answer_story_slug ?? post.answer_story_id}?chapter=${post.answer_chapter ?? 0}`}
+              className="mb-2 block text-xs text-zinc-500 hover:underline"
+            >
+              📖 {post.answer_story_title ?? "the story"} · Chapter{" "}
+              {(post.answer_chapter ?? 0) + 1} →
+            </Link>
+          )}
+          {revealed ? (
+            <PostBody text={post.body} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRevealed(true)}
+              className="flex w-full flex-col items-center gap-0.5 rounded-lg border border-dashed border-zinc-300 bg-zinc-50 px-3 py-5 text-center hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900/40 dark:hover:bg-zinc-900"
+            >
+              <span className="text-sm text-zinc-500">
+                🙈 Chapter {(post.answer_chapter ?? 0) + 1} answer — may contain spoilers
+              </span>
+              <span className="text-xs font-medium text-accent">Tap to reveal</span>
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="mt-3">
+          <PostBody text={post.body} />
+        </div>
+      )}
 
       <div className="mt-3 flex items-center gap-5 text-sm text-zinc-500">
         <button

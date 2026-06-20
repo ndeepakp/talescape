@@ -31,9 +31,20 @@ export const POST = withErrors(async (req: Request) => {
     coverStyle,
     decision,
     inspiredById,
+    draftOf,
   } = await req.json().catch(() => ({}));
 
   const isDraft = status === "draft";
+  // A draft can be the "working copy" of one of the author's published stories.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let draftOfId: string | null = null;
+  if (isDraft && typeof draftOf === "string" && UUID_RE.test(draftOf)) {
+    const [origin] = await sql<{ id: string }[]>`
+      SELECT id FROM stories
+      WHERE id = ${draftOf} AND author_id = ${session.user.id} AND status = 'published'
+    `;
+    if (origin) draftOfId = origin.id;
+  }
   const isPublic = chaptersPublic === true;
   const offered = normalizeOfferedDurations(offeredDurations);
   const wholePriceMap = normalizePrices(wholePrices, offered);
@@ -86,7 +97,7 @@ export const POST = withErrors(async (req: Request) => {
     INSERT INTO stories (
       author_id, title, slug, summary, chapters, body, status, chapters_public,
       offered_durations, whole_prices, currency, cover_url, cover_style,
-      draft_expires_at, embedding
+      draft_expires_at, embedding, draft_of
     )
     VALUES (
       ${session.user.id}, ${cleanTitle}, ${storySlug}, ${cleanSummary},
@@ -95,7 +106,7 @@ export const POST = withErrors(async (req: Request) => {
       ${offered}, ${sql.json(wholePriceMap)}, ${storyCurrency}, ${cover},
       ${coverStyleVal ? sql.json(coverStyleVal) : null},
       ${isDraft ? sql`now() + interval '7 days'` : null},
-      ${vec ? sql`${vec}::vector` : null}
+      ${vec ? sql`${vec}::vector` : null}, ${draftOfId}
     )
     RETURNING id
   `;

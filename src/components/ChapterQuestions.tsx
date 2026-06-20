@@ -1,39 +1,30 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
-type McqQ = {
+type Quiz = {
   id: string;
-  type: "mcq";
   prompt: string;
   options: string[];
-  counts: number[];
-  total: number;
-  myChoice: number | null;
+  myChoice: number | null; // the reader's chosen option, or null
+  correct: number | null; // revealed only once answered
 };
-type OpenQ = {
-  id: string;
-  type: "open";
-  prompt: string;
-  answers: { answer: string; author: string | null; handle: string | null; mine: boolean }[];
-  myAnswer: string | null;
-};
-type Q = McqQ | OpenQ;
 
-function McqItem({
+function QuizItem({
   q,
   storyId,
   chapterIndex,
   reload,
 }: {
-  q: McqQ;
+  q: Quiz;
   storyId: string;
   chapterIndex: number;
   reload: () => void;
 }) {
   const answered = q.myChoice !== null;
+
   async function pick(i: number) {
+    if (answered) return; // locked once answered, so the score stays honest
     const res = await fetch(`/api/stories/${storyId}/qna`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,114 +32,40 @@ function McqItem({
     });
     if (res.ok) reload();
   }
+
   return (
     <div>
       <p className="font-medium text-zinc-800 dark:text-zinc-200">{q.prompt}</p>
       <div className="mt-2 flex flex-col gap-1.5">
         {q.options.map((opt, i) => {
-          const pct = q.total ? Math.round((q.counts[i] / q.total) * 100) : 0;
-          const selected = q.myChoice === i;
+          const isCorrect = answered && q.correct === i;
+          const isWrongPick = answered && q.myChoice === i && q.correct !== i;
           return (
             <button
               key={i}
               type="button"
+              disabled={answered}
               onClick={() => pick(i)}
               className={
-                "relative overflow-hidden rounded-lg border px-3 py-2 text-left text-sm transition-colors " +
-                (selected
-                  ? "border-accent"
-                  : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900")
+                "rounded-lg border px-3 py-2 text-left text-sm transition-colors " +
+                (isCorrect
+                  ? "border-emerald-500 bg-emerald-50 dark:border-emerald-600 dark:bg-emerald-950/30"
+                  : isWrongPick
+                    ? "border-red-500 bg-red-50 dark:border-red-600 dark:bg-red-950/30"
+                    : answered
+                      ? "border-zinc-200 dark:border-zinc-800"
+                      : "border-zinc-300 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-900")
               }
             >
-              {answered && (
-                <span
-                  className="absolute inset-y-0 left-0 bg-accent/15"
-                  style={{ width: `${pct}%` }}
-                />
-              )}
-              <span className="relative flex items-center justify-between gap-2">
-                <span className="text-zinc-800 dark:text-zinc-200">
-                  {opt}
-                  {selected && " ✓"}
-                </span>
-                {answered && <span className="text-xs text-zinc-500">{pct}%</span>}
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-zinc-800 dark:text-zinc-200">{opt}</span>
+                {isCorrect && <span className="text-emerald-600 dark:text-emerald-400">✓</span>}
+                {isWrongPick && <span className="text-red-600 dark:text-red-400">✗</span>}
               </span>
             </button>
           );
         })}
       </div>
-      {answered && (
-        <p className="mt-1 text-xs text-zinc-400">
-          {q.total} {q.total === 1 ? "response" : "responses"}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function OpenItem({
-  q,
-  storyId,
-  chapterIndex,
-  reload,
-}: {
-  q: OpenQ;
-  storyId: string;
-  chapterIndex: number;
-  reload: () => void;
-}) {
-  const [draft, setDraft] = useState(q.myAnswer ?? "");
-  const [busy, setBusy] = useState(false);
-  async function submit() {
-    const text = draft.trim();
-    if (!text) return;
-    setBusy(true);
-    const res = await fetch(`/api/stories/${storyId}/qna`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chapterIndex, questionId: q.id, answer: text }),
-    });
-    setBusy(false);
-    if (res.ok) reload();
-  }
-  return (
-    <div>
-      <p className="font-medium text-zinc-800 dark:text-zinc-200">{q.prompt}</p>
-      <div className="mt-2 flex gap-2">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          maxLength={1000}
-          placeholder="Your answer…"
-          className="flex-1 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-sm text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
-        />
-        <button
-          type="button"
-          onClick={submit}
-          disabled={busy || !draft.trim()}
-          className="rounded-full btn-primary px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-        >
-          {q.myAnswer ? "Update" : "Answer"}
-        </button>
-      </div>
-      {q.answers.length > 0 && (
-        <ul className="mt-2 flex flex-col gap-1.5">
-          {q.answers.map((a, i) => (
-            <li key={i} className="text-sm">
-              <Link
-                href={`/${a.handle ?? ""}`}
-                className="font-medium text-zinc-800 hover:underline dark:text-zinc-200"
-              >
-                {a.author ?? "Reader"}
-              </Link>
-              <span className="text-zinc-400">: </span>
-              <span className="whitespace-pre-wrap break-words text-zinc-700 dark:text-zinc-300">
-                {a.answer}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }
@@ -160,11 +77,11 @@ export function ChapterQuestions({
   storyId: string;
   chapterIndex: number;
 }) {
-  const [questions, setQuestions] = useState<Q[] | null>(null);
+  const [questions, setQuestions] = useState<Quiz[] | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/stories/${storyId}/qna?chapter=${chapterIndex}`);
-    if (res.ok) setQuestions((await res.json()).questions as Q[]);
+    if (res.ok) setQuestions((await res.json()).questions as Quiz[]);
   }, [storyId, chapterIndex]);
 
   useEffect(() => {
@@ -176,19 +93,33 @@ export function ChapterQuestions({
 
   if (!questions || questions.length === 0) return null;
 
+  const answeredAll = questions.every((q) => q.myChoice !== null);
+  const score = questions.filter(
+    (q) => q.myChoice !== null && q.myChoice === q.correct,
+  ).length;
+
   return (
     <section className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-      <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-        Questions for this chapter
-      </h4>
-      <div className="mt-3 flex flex-col gap-5">
-        {questions.map((q) =>
-          q.type === "mcq" ? (
-            <McqItem key={q.id} q={q} storyId={storyId} chapterIndex={chapterIndex} reload={load} />
-          ) : (
-            <OpenItem key={q.id} q={q} storyId={storyId} chapterIndex={chapterIndex} reload={load} />
-          ),
+      <div className="flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
+          Chapter quiz
+        </h4>
+        {answeredAll && (
+          <span className="shrink-0 rounded-full bg-accent/10 px-2.5 py-0.5 text-xs font-semibold text-accent">
+            You scored {score}/{questions.length} 🎉
+          </span>
         )}
+      </div>
+      <div className="mt-3 flex flex-col gap-5">
+        {questions.map((q) => (
+          <QuizItem
+            key={q.id}
+            q={q}
+            storyId={storyId}
+            chapterIndex={chapterIndex}
+            reload={load}
+          />
+        ))}
       </div>
     </section>
   );
