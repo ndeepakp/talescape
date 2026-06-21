@@ -1,5 +1,5 @@
-import { PostComposer } from "@/components/PostComposer";
-import { PostCard } from "@/components/PostCard";
+import { PostComposer } from "@/components/post/PostComposer";
+import { PostCard } from "@/components/post/PostCard";
 import type { PostRow } from "@/lib/posts";
 
 // A list of posts, optionally with a composer on top. Used on the feed (with

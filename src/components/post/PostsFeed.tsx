@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { PostComposer } from "@/components/PostComposer";
-import { PostCard } from "@/components/PostCard";
+import { PostComposer } from "@/components/post/PostComposer";
+import { PostCard } from "@/components/post/PostCard";
 import type { PostRow } from "@/lib/posts";
 
 function chipCls(on: boolean): string {

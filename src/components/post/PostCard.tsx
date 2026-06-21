@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Avatar } from "@/components/Avatar";
-import { PostBody } from "@/components/PostBody";
+import { Avatar } from "@/components/layout/Avatar";
+import { PostBody } from "@/components/post/PostBody";
 import type { PostRow } from "@/lib/posts";
 
 type Comment = {

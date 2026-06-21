@@ -62,4 +62,37 @@ migration** and a **painful, hand-rolled data move** later.
 
 ---
 
+## 2. Make money real — replace the mock payment layer
+
+**Priority: HIGHEST (existential) — before any real launch or growth push.**
+
+Talerooms is a marketplace, but **no actual money moves** yet — purchases,
+subscriptions and earnings all run through a mock layer. Until this is real we
+can't validate the core thesis (will readers pay?), pay creators, or call
+ourselves a business. This is the scariest, most-regulated piece, so it needs
+real planning, not a quick hack:
+
+- Integrate a real payment processor (e.g. Stripe) for one-off chapter/story
+  purchases **and** recurring author subscriptions.
+- Creator payouts (Stripe Connect or similar), fees/tax handling, refunds,
+  receipts, and a webhook-driven source of truth for entitlements.
+- Replace the mock purchase/subscription flows and reconcile existing
+  `access_grants` / `subscriptions` data.
+
+---
+
+## 3. Pre-launch hardening (do these before scaling)
+
+Small but non-negotiable before a public push:
+
+- **Object storage** — see item 1; get uploads off the local disk first.
+- **Chapter images** — let stories embed pictures (reusable for everyone; the
+  gateway to the Kids vertical). Build on top of object storage, never store
+  bytes in Postgres. Design for **multiple images per chapter** from day one.
+- **Email verification** — finish the parked signup email-verification flow
+  (better-auth supports it; needs a real email provider wired in). Table stakes
+  for a trustworthy signup.
+
+---
+
 _Add new must-do migration items below as we discover them._

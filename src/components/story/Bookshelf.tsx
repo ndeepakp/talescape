@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { BookCover } from "@/components/BookCover";
-import { StarRating } from "@/components/StarRating";
+import { BookCover } from "@/components/story/BookCover";
+import { StarRating } from "@/components/story/StarRating";
 import { currencySymbol } from "@/lib/pricing";
 import { formatCount } from "@/lib/format";
 import { type CoverStyle } from "@/lib/cover-style";

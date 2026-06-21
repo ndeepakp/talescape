@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { SearchBar } from "@/components/SearchBar";
+import { SearchBar } from "@/components/layout/SearchBar";
 
 export const dynamic = "force-dynamic";
 

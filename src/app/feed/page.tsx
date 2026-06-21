@@ -4,11 +4,11 @@ import { headers, cookies } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getAppearance } from "@/lib/get-appearance";
-import { Bookshelf, type BookshelfStory } from "@/components/Bookshelf";
-import { WeekPanel, type WeekStats } from "@/components/WeekPanel";
-import { ContinueReading } from "@/components/ContinueReading";
-import { PostsFeed } from "@/components/PostsFeed";
-import { SideTabs } from "@/components/SideTabs";
+import { Bookshelf, type BookshelfStory } from "@/components/story/Bookshelf";
+import { WeekPanel, type WeekStats } from "@/components/feed/WeekPanel";
+import { ContinueReading } from "@/components/feed/ContinueReading";
+import { PostsFeed } from "@/components/post/PostsFeed";
+import { SideTabs } from "@/components/feed/SideTabs";
 import { getPosts } from "@/lib/posts";
 
 export const dynamic = "force-dynamic";

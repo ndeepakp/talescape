@@ -3,8 +3,8 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { Avatar } from "@/components/Avatar";
-import { StarRating } from "@/components/StarRating";
+import { Avatar } from "@/components/layout/Avatar";
+import { StarRating } from "@/components/story/StarRating";
 import { resolveStory, isUuid } from "@/lib/slug";
 
 export const dynamic = "force-dynamic";

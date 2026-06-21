@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   NotificationMessage,
   type Notification,
-} from "@/components/NotificationMessage";
+} from "@/components/notifications/NotificationMessage";
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);

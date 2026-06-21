@@ -21,10 +21,10 @@ import {
   TIER_LABELS,
   type Tier,
 } from "@/lib/pricing";
-import { RichTextEditor } from "@/components/RichTextEditor";
-import { ChapterQuestionsEditor } from "@/components/ChapterQuestionsEditor";
-import { ChapterPromptsEditor } from "@/components/ChapterPromptsEditor";
-import { BookCover } from "@/components/BookCover";
+import { RichTextEditor } from "@/components/write/RichTextEditor";
+import { ChapterQuestionsEditor } from "@/components/write/ChapterQuestionsEditor";
+import { ChapterPromptsEditor } from "@/components/write/ChapterPromptsEditor";
+import { BookCover } from "@/components/story/BookCover";
 import { COVER_PALETTES, type CoverStyle } from "@/lib/cover-style";
 
 type Genre = { id: number; name: string };

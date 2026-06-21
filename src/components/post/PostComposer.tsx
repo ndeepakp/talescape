@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MentionInput } from "@/components/MentionInput";
+import { MentionInput } from "@/components/post/MentionInput";
 
 export function PostComposer({
   placeholder = "Share something about stories… type @ to tag a person or story",

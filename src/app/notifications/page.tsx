@@ -5,7 +5,7 @@ import { sql } from "@/lib/db";
 import {
   NotificationMessage,
   type Notification,
-} from "@/components/NotificationMessage";
+} from "@/components/notifications/NotificationMessage";
 
 export const dynamic = "force-dynamic";
 

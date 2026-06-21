@@ -2,10 +2,10 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { NavMenu } from "@/components/NavMenu";
-import { NotificationBell } from "@/components/NotificationBell";
-import { SearchBar } from "@/components/SearchBar";
-import { Avatar } from "@/components/Avatar";
+import { NavMenu } from "@/components/layout/NavMenu";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { SearchBar } from "@/components/layout/SearchBar";
+import { Avatar } from "@/components/layout/Avatar";
 
 // Global top bar shown on every page once signed in: brand, Write, the
 // notification bell and the hamburger menu. Hidden when logged out (login /

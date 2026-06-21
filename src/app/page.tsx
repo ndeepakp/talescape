@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { BookCover } from "@/components/BookCover";
+import { BookCover } from "@/components/story/BookCover";
 import { currencySymbol } from "@/lib/pricing";
 import { formatCount } from "@/lib/format";
 import { type CoverStyle } from "@/lib/cover-style";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MiniBarChart, type ChartPoint } from "@/components/MiniBarChart";
+import { MiniBarChart, type ChartPoint } from "@/components/profile/MiniBarChart";
 import { CURRENCY } from "@/lib/pricing";
 
 const RANGES = [

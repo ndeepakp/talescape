@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CURRENCY } from "@/lib/pricing";
-import { AvatarUpload } from "@/components/AvatarUpload";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
 
 type Genre = { id: number; name: string };
 

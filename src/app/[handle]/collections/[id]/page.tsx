@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { DeleteCollectionButton } from "@/components/DeleteCollectionButton";
-import { ShareCollection } from "@/components/ShareCollection";
+import { DeleteCollectionButton } from "@/components/collections/DeleteCollectionButton";
+import { ShareCollection } from "@/components/collections/ShareCollection";
 
 export const dynamic = "force-dynamic";
 

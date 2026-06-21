@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { PostComposer } from "@/components/PostComposer";
+import { PostComposer } from "@/components/post/PostComposer";
 
 // Reader-facing discussion prompts for a chapter. Answering one opens the post
 // composer (tagged with this story + chapter + prompt); the answer becomes a

@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
-import { DeleteStoryButton } from "@/components/DeleteStoryButton";
+import { DeleteStoryButton } from "@/components/story/DeleteStoryButton";
 
 export const dynamic = "force-dynamic";
 

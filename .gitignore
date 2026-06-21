@@ -42,3 +42,7 @@ next-env.d.ts
 
 # user-uploaded files (wallpapers, etc.)
 /public/uploads
+
+# Never commit keys
+deepak_ssh
+deepak_ssh.pub

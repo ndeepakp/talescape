@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar } from "@/components/Avatar";
+import { Avatar } from "@/components/layout/Avatar";
 
 export function AvatarUpload({
   name,

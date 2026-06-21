@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { StarSvg } from "@/components/StarRating";
+import { StarSvg } from "@/components/story/StarRating";
 
 type MyReview = { stars: number; liked: string | null; disliked: string | null };
 

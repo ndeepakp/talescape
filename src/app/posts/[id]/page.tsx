@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { getPost } from "@/lib/posts";
-import { PostCard } from "@/components/PostCard";
+import { PostCard } from "@/components/post/PostCard";
 
 export const dynamic = "force-dynamic";
 

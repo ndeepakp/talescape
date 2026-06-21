@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAPTER_PAGE_WORDS, wordCount } from "@/lib/story-validation";
-import { ChapterQuestions } from "@/components/ChapterQuestions";
-import { ChapterPrompts } from "@/components/ChapterPrompts";
+import { ChapterQuestions } from "@/components/reader/ChapterQuestions";
+import { ChapterPrompts } from "@/components/reader/ChapterPrompts";
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, " ");
