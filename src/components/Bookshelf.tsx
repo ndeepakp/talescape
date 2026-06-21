@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BookCover } from "@/components/BookCover";
 import { StarRating } from "@/components/StarRating";
@@ -60,7 +60,7 @@ function DetailPane({
   onClose: () => void;
 }) {
   return (
-    <aside className="fixed inset-0 z-40 overflow-y-auto bg-[var(--page)] p-6 md:static md:z-auto md:w-[380px] md:shrink-0 md:overflow-visible md:bg-transparent md:p-0">
+    <aside className="fixed inset-0 z-40 overflow-y-auto bg-[var(--page)] p-6 md:static md:z-auto md:w-full md:shrink-0 md:overflow-visible md:bg-transparent md:p-0">
       <div className="rounded-2xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-950 md:sticky md:top-6">
         <button
           type="button"
@@ -134,7 +134,15 @@ function DetailPane({
   );
 }
 
-export function Bookshelf({ stories }: { stories: BookshelfStory[] }) {
+export function Bookshelf({
+  stories,
+  rightExtra,
+}: {
+  stories: BookshelfStory[];
+  // Extra content for the right rail (e.g. the "Your week" panel). Shown on its
+  // own, and below the detail pane once a book is opened.
+  rightExtra?: ReactNode;
+}) {
   const [selId, setSelId] = useState<string | null>(null);
   const selected = stories.find((s) => s.id === selId) ?? null;
 
@@ -193,7 +201,12 @@ export function Bookshelf({ stories }: { stories: BookshelfStory[] }) {
         ))}
       </div>
 
-      {selected && <DetailPane story={selected} onClose={() => setSelId(null)} />}
+      {(selected || rightExtra) && (
+        <div className="flex w-full flex-col gap-5 md:w-[380px] md:shrink-0">
+          {selected && <DetailPane story={selected} onClose={() => setSelId(null)} />}
+          {rightExtra}
+        </div>
+      )}
     </div>
   );
 }

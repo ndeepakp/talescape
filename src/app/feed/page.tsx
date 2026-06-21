@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getAppearance } from "@/lib/get-appearance";
 import { Bookshelf, type BookshelfStory } from "@/components/Bookshelf";
+import { WeekPanel, type WeekStats } from "@/components/WeekPanel";
 import { ContinueReading } from "@/components/ContinueReading";
 import { PostsFeed } from "@/components/PostsFeed";
 import { SideTabs } from "@/components/SideTabs";
@@ -38,6 +39,37 @@ export default async function FeedPage() {
 
   // Community posts (newest first, all authors).
   const posts = await getPosts({ viewerId: session.user.id });
+
+  // "Your week" — the reader's last-7-days activity for the feed right-rail panel.
+  const me = session.user.id;
+  const [reads] = await sql<{ n: number }[]>`
+    SELECT COUNT(DISTINCT story_id)::int AS n FROM story_views
+    WHERE viewer_id = ${me} AND created_at >= now() - interval '7 days'
+  `;
+  const [quiz] = await sql<{ total: number; correct: number }[]>`
+    SELECT COUNT(*)::int AS total,
+           COUNT(*) FILTER (WHERE a.choice = (q.value->>'answer')::int)::int AS correct
+    FROM question_answers a
+    JOIN stories s ON s.id = a.story_id
+    CROSS JOIN LATERAL jsonb_array_elements(
+      COALESCE(s.chapters -> a.chapter_index -> 'questions', '[]'::jsonb)
+    ) q
+    WHERE a.user_id = ${me}
+      AND a.created_at >= now() - interval '7 days'
+      AND q.value->>'id' = a.question_id
+  `;
+  const [ans] = await sql<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n FROM posts
+    WHERE author_id = ${me} AND answer_story_id IS NOT NULL
+      AND created_at >= now() - interval '7 days'
+  `;
+  const weekStats: WeekStats = {
+    name: session.user.name ?? null,
+    storiesRead: reads?.n ?? 0,
+    quizzesTaken: quiz?.total ?? 0,
+    quizScore: quiz && quiz.total > 0 ? Math.round((quiz.correct / quiz.total) * 100) : 0,
+    answers: ans?.n ?? 0,
+  };
 
   // Personalised feed: only stories tagged with one of the reader's favourite
   // genres. A reader with no saved genres (e.g. older accounts) sees everything.
@@ -115,7 +147,10 @@ export default async function FeedPage() {
                     <Link href="/write" className="underline">write one</Link>?
                   </p>
                 ) : (
-                  <Bookshelf stories={stories} />
+                  <Bookshelf
+                    stories={stories}
+                    rightExtra={<WeekPanel stats={weekStats} />}
+                  />
                 ),
             },
             {
