@@ -6,6 +6,7 @@ import { sql } from "@/lib/db";
 import { getAppearance } from "@/lib/get-appearance";
 import { Bookshelf, type BookshelfStory } from "@/components/story/Bookshelf";
 import { WeekPanel, type WeekStats } from "@/components/feed/WeekPanel";
+import { NewChapters, type NewChapterStory } from "@/components/feed/NewChapters";
 import { ContinueReading } from "@/components/feed/ContinueReading";
 import { PostsFeed } from "@/components/post/PostsFeed";
 import { SideTabs } from "@/components/feed/SideTabs";
@@ -71,6 +72,24 @@ export default async function FeedPage() {
     answers: ans?.n ?? 0,
   };
 
+  // "New chapters for you": stories with unseen new_chapter notifications — the
+  // serial loop's pull-back, surfaced as a strip at the top of the feed.
+  const newChapters = await sql<NewChapterStory[]>`
+    SELECT s.id, s.slug, s.title, u.name AS author,
+           s.cover_url, s.cover_style,
+           COALESCE(rp.chapter_index, 0) AS chapter_index,
+           COUNT(*)::int AS new_count
+    FROM notifications n
+    JOIN stories s ON s.id = n.story_id
+    JOIN "user" u ON u.id = s.author_id
+    LEFT JOIN reading_progress rp ON rp.story_id = s.id AND rp.user_id = ${me}
+    WHERE n.user_id = ${me} AND n.kind = 'new_chapter' AND NOT n.seen
+      AND s.status = 'published'
+    GROUP BY s.id, u.name, rp.chapter_index
+    ORDER BY MAX(n.created_at) DESC
+    LIMIT 12
+  `;
+
   // Personalised feed: only stories tagged with one of the reader's favourite
   // genres. A reader with no saved genres (e.g. older accounts) sees everything.
   const stories = await sql<BookshelfStory[]>`
@@ -133,6 +152,8 @@ export default async function FeedPage() {
             `${resume.story_id}:${resume.chapter_index}` && (
             <ContinueReading resume={resume} />
           )}
+
+        <NewChapters stories={newChapters} />
 
         <SideTabs
           tabs={[
