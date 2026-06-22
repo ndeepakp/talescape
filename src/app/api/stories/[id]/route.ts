@@ -152,10 +152,14 @@ export const PUT = withErrors(async (
     }
   }
 
-  // A new chapter on a published story: notify the author's active subscribers
-  // and anyone holding an active whole-story pass (they get future chapters).
+  // A new chapter on a published story: notify the people who'd want to come
+  // back for it — the author's followers, their active subscribers, and anyone
+  // holding an active whole-story pass. UNION dedupes overlap.
   if (!isDraft && cleanChapters.length > owned.old_chapters) {
     const recipients = await sql<{ user_id: string }[]>`
+      SELECT follower_id AS user_id FROM follows
+      WHERE following_id = ${session.user.id}
+      UNION
       SELECT subscriber_id AS user_id FROM subscriptions
       WHERE author_id = ${session.user.id} AND expires_at > now()
       UNION
