@@ -136,24 +136,16 @@ export default async function FeedPage() {
       style={wallpaper ? { backgroundImage: `url(${wallpaper})` } : undefined}
     >
       <div className="mx-auto w-full max-w-6xl">
-        <div className="flex items-center justify-between gap-3">
-          <h1
-            className={
-              "text-2xl font-bold text-zinc-900 dark:text-zinc-50 " +
-              (wallpaper
-                ? "inline-block rounded-xl bg-[var(--page)]/70 px-3 py-1 backdrop-blur-sm"
-                : "")
-            }
-          >
-            Your feed
-          </h1>
-          <Link
-            href="/library"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-300 bg-[var(--page)]/70 px-4 py-2 text-sm font-medium text-zinc-700 backdrop-blur-sm transition-colors hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
-          >
-            📚 Library
-          </Link>
-        </div>
+        <h1
+          className={
+            "text-2xl font-bold text-zinc-900 dark:text-zinc-50 " +
+            (wallpaper
+              ? "inline-block rounded-xl bg-[var(--page)]/70 px-3 py-1 backdrop-blur-sm"
+              : "")
+          }
+        >
+          Your feed
+        </h1>
 
         {resume &&
           (await cookies()).get("resume_dismissed")?.value !==

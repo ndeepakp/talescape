@@ -69,56 +69,52 @@ export default async function LibraryPage() {
             to start reading.
           </p>
         ) : (
-          <ul className="mt-6 flex flex-col gap-3">
+          <div className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-5">
             {stories.map((s) => {
               const done = Math.min(s.chapter_index + 1, s.chapter_count);
               const pct = s.chapter_count > 0 ? (done / s.chapter_count) * 100 : 0;
               return (
-                <li key={s.id}>
-                  <Link
-                    href={`/stories/${s.slug ?? s.id}?chapter=${s.chapter_index}`}
-                    className="flex gap-4 rounded-2xl border border-zinc-200 bg-white p-4 transition-colors hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-600"
-                  >
-                    <BookCover
-                      title={s.title}
-                      author={s.author}
-                      coverUrl={s.cover_url}
-                      coverStyle={s.cover_style}
-                      className="h-24 w-16 shrink-0 rounded-md"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <h2 className="truncate font-semibold text-zinc-900 dark:text-zinc-50">
-                          {s.title}
-                        </h2>
-                        {s.has_new && (
-                          <span className="shrink-0 rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-semibold text-accent">
-                            ✨ New chapter
-                          </span>
-                        )}
+                <Link
+                  key={s.id}
+                  href={`/stories/${s.slug ?? s.id}?chapter=${s.chapter_index}`}
+                  className="group relative block"
+                  title={s.title}
+                >
+                  <BookCover
+                    title={s.title}
+                    author={s.author}
+                    coverUrl={s.cover_url}
+                    coverStyle={s.cover_style}
+                    className="aspect-[2/3] w-full rounded-md shadow-sm transition group-hover:-translate-y-1 group-hover:shadow-md"
+                  />
+                  {s.has_new && (
+                    <span className="absolute left-1 top-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-fg shadow">
+                      ✨ New
+                    </span>
+                  )}
+                  {/* Progress revealed on hover */}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 rounded-b-md bg-gradient-to-t from-black/85 via-black/55 to-transparent p-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <p className="truncate text-[11px] font-semibold text-white">
+                      {s.title}
+                    </p>
+                    <p className="text-[10px] text-white/80">
+                      {s.chapter_count > 0
+                        ? `Chapter ${done} / ${s.chapter_count}`
+                        : "No chapters yet"}
+                    </p>
+                    {s.chapter_count > 0 && (
+                      <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/30">
+                        <div
+                          className="h-full rounded-full bg-white"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
-                      <p className="truncate text-xs text-zinc-500">
-                        by {s.author ?? "Unknown"}
-                      </p>
-                      <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
-                        {s.chapter_count > 0
-                          ? `Chapter ${done} of ${s.chapter_count}`
-                          : "No chapters yet"}
-                      </p>
-                      {s.chapter_count > 0 && (
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-                          <div
-                            className="h-full rounded-full bg-accent"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                </li>
+                    )}
+                  </div>
+                </Link>
               );
             })}
-          </ul>
+          </div>
         )}
       </div>
     </div>
