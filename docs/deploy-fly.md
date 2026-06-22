@@ -133,7 +133,7 @@ install locally), so reproduce the schema from a local dump, then load it as the
 superuser through a proxy:
 
 ```bash
-pg_dump --schema-only --no-owner --no-privileges -d talescape -f /tmp/schema.sql
+pg_dump --schema-only --no-owner --no-privileges -d talerooms -f /tmp/schema.sql
 fly proxy 15432:5432 -a talerooms-pg          # leave running
 psql "postgresql://postgres:<password>@localhost:15432/talerooms" -f /tmp/schema.sql
 # Genres are reference data — load the seed so signup shows them:
