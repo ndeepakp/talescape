@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CHAPTER_PAGE_WORDS, wordCount } from "@/lib/story-validation";
 import { ChapterQuestions } from "@/components/reader/ChapterQuestions";
 import { ChapterPrompts } from "@/components/reader/ChapterPrompts";
+import { ReaderShield } from "@/components/reader/ReaderShield";
 
 function stripTags(html: string): string {
   return html.replace(/<[^>]+>/g, " ");
@@ -86,6 +87,7 @@ export function ChapterReader({
   initialPage,
   initialBookmarks,
   autoResume,
+  watermark,
 }: {
   storyId: string;
   chapters: ReaderChapter[];
@@ -93,6 +95,8 @@ export function ChapterReader({
   initialPage: number;
   initialBookmarks: Bookmark[];
   autoResume: boolean;
+  // Per-reader label for the anti-leak watermark + screenshot deterrent.
+  watermark?: string;
 }) {
   const clampedInitial = Math.min(
     Math.max(initialChapter, 0),
@@ -123,6 +127,9 @@ export function ChapterReader({
 
   const chapter = chapters[current];
   const chapterBookmarks = bookmarks.filter((b) => b.chapter_index === current);
+  // A "short story" is a single, untitled chapter — render it as plain story
+  // content with none of the chapter chrome (no nav, no "Chapter 1" heading).
+  const isShort = chapters.length === 1 && !chapters[0]?.title;
 
   // Paginate long chapters. We only paginate after mount (DOMParser is
   // client-only); the first paint matches the server (one page) to avoid a
@@ -399,13 +406,16 @@ export function ChapterReader({
 
   return (
     <div
-      className="mt-6"
+      className="relative mt-6"
       onMouseDown={() => {
         setSel(null);
         setDef(null);
       }}
     >
-      {/* Chapter pagination buttons */}
+      {watermark && <ReaderShield label={watermark} />}
+
+      {/* Chapter pagination buttons — hidden for a single-piece short story. */}
+      {!isShort && (
       <div className="flex flex-wrap gap-2">
         {chapters.map((ch) => {
           const active = ch.index === current;
@@ -430,12 +440,15 @@ export function ChapterReader({
           );
         })}
       </div>
+      )}
 
       {/* Current chapter */}
-      <div className="mt-6">
-        <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
-          {chapter.title ? chapter.title : `Chapter ${current + 1}`}
-        </h3>
+      <div className={isShort ? "" : "mt-6"}>
+        {(chapter.title || !isShort) && (
+          <h3 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
+            {chapter.title ? chapter.title : `Chapter ${current + 1}`}
+          </h3>
+        )}
 
         {chapter.locked ? (
           <div className="mt-4 rounded-xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
@@ -544,7 +557,8 @@ export function ChapterReader({
           </>
         )}
 
-        {/* Prev / next */}
+        {/* Prev / next — hidden for a single-piece short story. */}
+        {!isShort && (
         <div className="mt-6 flex items-center justify-between">
           <button
             type="button"
@@ -566,6 +580,7 @@ export function ChapterReader({
             Next →
           </button>
         </div>
+        )}
       </div>
 
       {/* Floating actions shown over a text selection: bookmark, and — for a

@@ -6,6 +6,20 @@ export const MAX_SUMMARY_WORDS = 150;
 // Shared by the reader (ChapterReader) and the write form's hint.
 export const CHAPTER_PAGE_WORDS = 750;
 
+// Maximum length (in visible words) of a chapter, and of a single-piece short
+// story. Measured on the plain text (htmlToText), so markup doesn't count.
+export const MAX_CHAPTER_WORDS = 2500;
+export const MAX_SHORT_STORY_WORDS = 3000;
+
+// Average adult reading speed, used for the "X min read" estimate on a story.
+export const WORDS_PER_MINUTE = 238;
+
+// Whole-minute reading estimate for `words` of content (at least 1 min when
+// there's any text; 0 for an empty story).
+export function readingMinutes(words: number): number {
+  return words > 0 ? Math.max(1, Math.round(words / WORDS_PER_MINUTE)) : 0;
+}
+
 // A graded quiz question shown after a chapter: a prompt, 2–8 options, and the
 // index of the correct option. `id` is stable (client-generated) so a reader's
 // answer survives edits.
@@ -164,6 +178,25 @@ export function validateStory(
   // normalizeChapters already drops blank ones, so we just sanity-check shape.
   if (chapters !== undefined && !Array.isArray(chapters)) {
     return "Something looks off with your chapters.";
+  }
+
+  // Length cap: 2,500 words per chapter, or 3,000 for a single-piece short
+  // story (one untitled chapter).
+  if (Array.isArray(chapters)) {
+    const arr = chapters as { title?: unknown; body?: unknown }[];
+    const isShort =
+      arr.length === 1 &&
+      !(typeof arr[0]?.title === "string" && (arr[0].title as string).trim());
+    const limit = isShort ? MAX_SHORT_STORY_WORDS : MAX_CHAPTER_WORDS;
+    for (let i = 0; i < arr.length; i++) {
+      const body = typeof arr[i]?.body === "string" ? (arr[i].body as string) : "";
+      const words = wordCount(htmlToText(body));
+      if (words > limit) {
+        return isShort
+          ? `Your story is ${words.toLocaleString()} words — the limit is ${limit.toLocaleString()}.`
+          : `Chapter ${i + 1} is ${words.toLocaleString()} words — the limit is ${limit.toLocaleString()} per chapter.`;
+      }
+    }
   }
 
   const validGenres = Array.isArray(genreIds)

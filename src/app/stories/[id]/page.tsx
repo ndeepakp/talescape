@@ -21,6 +21,7 @@ import { ViewTracker } from "@/components/reader/ViewTracker";
 import { ChapterReader, type Bookmark } from "@/components/reader/ChapterReader";
 import { SaveToCollection } from "@/components/story/SaveToCollection";
 import { RENEWAL_DISCOUNT_PCT, type Tier } from "@/lib/pricing";
+import { htmlToText, wordCount, readingMinutes } from "@/lib/story-validation";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +105,15 @@ export default async function StoryPage({
 
   const isAuthor = session.user.id === story.author_id;
 
+  // Per-reader watermark label, used to trace any leaked screenshot of the
+  // chapters back to the account that opened them.
+  const [viewer] = await sql<{ username: string | null; name: string | null }[]>`
+    SELECT username, name FROM "user" WHERE id = ${session.user.id}
+  `;
+  const watermark = viewer?.username
+    ? `@${viewer.username}`
+    : (viewer?.name ?? "reader");
+
   // A draft is private to its author — nobody else can reach it, not even its
   // public summary.
   if (story.status === "draft" && !isAuthor) notFound();
@@ -126,6 +136,15 @@ export default async function StoryPage({
     SELECT chapters FROM stories WHERE id = ${id}
   `;
   const allChapters: Chapter[] = Array.isArray(crow?.chapters) ? crow.chapters : [];
+
+  // "X min read" — total words across every chapter (locked or not), at an
+  // average reading speed. Computed server-side so it's accurate even when a
+  // reader can't see all the chapter bodies.
+  const totalWords = allChapters.reduce(
+    (n, c) => n + wordCount(htmlToText(c.body ?? "")),
+    0,
+  );
+  const readMinutes = readingMinutes(totalWords);
 
   // Per-chapter access. The author and public stories unlock everything; a
   // reader unlocks the whole story (via a 'whole' grant) or individual chapters
@@ -353,12 +372,20 @@ export default async function StoryPage({
           · {date}
         </p>
 
-        {/* Read count — readers other than the author who have opened this story. */}
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-          <span aria-hidden="true">👁</span>
-          <span>
-            {formatCount(views)} {views === 1 ? "read" : "reads"}
-          </span>
+        {/* Read count + reading-time estimate. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+            <span aria-hidden="true">👁</span>
+            <span>
+              {formatCount(views)} {views === 1 ? "read" : "reads"}
+            </span>
+          </div>
+          {readMinutes > 0 && (
+            <div className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+              <span aria-hidden="true">⏱</span>
+              <span>{readMinutes} min read</span>
+            </div>
+          )}
         </div>
 
         {story.genres.length > 0 && (
@@ -401,7 +428,7 @@ export default async function StoryPage({
           <section className="mt-10 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-                Chapters
+                {allChapters.length === 1 && !allChapters[0].title ? "Story" : "Chapters"}
               </h2>
               <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
                 {story.chapters_public
@@ -442,6 +469,7 @@ export default async function StoryPage({
               initialPage={initialPage}
               initialBookmarks={bookmarks}
               autoResume={autoResume}
+              watermark={story.status === "published" ? watermark : undefined}
             />
           </section>
         )}

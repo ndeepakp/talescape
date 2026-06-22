@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  CHAPTER_PAGE_WORDS,
+  MAX_CHAPTER_WORDS,
+  MAX_SHORT_STORY_WORDS,
   MAX_SUMMARY_WORDS,
   MAX_TITLE_WORDS,
   htmlToText,
@@ -102,6 +103,13 @@ export function StoryForm({
   const [summary, setSummary] = useState(story?.summary ?? "");
   const [chapters, setChapters] = useState<DraftChapter[]>(
     toDrafts(Array.isArray(story?.chapters) ? story.chapters : []),
+  );
+  // "single" = a short story (one continuous body, no chapter divisions);
+  // "chapters" = a serialized story. A short story is stored as a single,
+  // untitled chapter, so we infer the mode from an existing story's shape.
+  const initialChapters = Array.isArray(story?.chapters) ? story.chapters : [];
+  const [format, setFormat] = useState<"single" | "chapters">(
+    initialChapters.length === 1 && !initialChapters[0]?.title ? "single" : "chapters",
   );
   const [selected, setSelected] = useState<number[]>(story?.genreIds ?? []);
   const [chaptersPublic, setChaptersPublic] = useState(story?.chaptersPublic ?? false);
@@ -327,6 +335,34 @@ export function StoryForm({
           ),
     );
   }
+  // Switch between short-story (single body) and chapters. Switching to "single"
+  // merges any existing chapters into one untitled body so nothing is lost;
+  // switching to "chapters" keeps the single body as chapter 1.
+  function chooseFormat(next: "single" | "chapters") {
+    if (next === format) return;
+    if (next === "single") {
+      setChapters((prev) => {
+        if (prev.length === 0) {
+          return [{ id: newId(), title: "", body: "", prices: {}, questions: [], prompts: [] }];
+        }
+        if (prev.length === 1) {
+          return [{ ...prev[0], title: "" }];
+        }
+        return [
+          {
+            id: prev[0].id,
+            title: "",
+            body: prev.map((c) => c.body).filter(Boolean).join("\n"),
+            prices: prev[0].prices,
+            questions: prev.flatMap((c) => c.questions),
+            prompts: prev.flatMap((c) => c.prompts),
+          },
+        ];
+      });
+    }
+    setFormat(next);
+  }
+
   function addChapter() {
     setChapters((prev) => [
       ...prev,
@@ -375,8 +411,12 @@ export function StoryForm({
         setSummary(data.summary);
       }
       setChapters(imported);
+      // A heading-less document imports as one untitled chapter → a short story;
+      // anything with headings is a multi-chapter story.
+      setFormat(imported.length === 1 && !imported[0].title ? "single" : "chapters");
     } else {
       setChapters((prev) => [...prev, ...imported]);
+      setFormat("chapters");
     }
   }
 
@@ -618,8 +658,9 @@ export function StoryForm({
                 📄 Already wrote it in Word?
               </p>
               <p className="mt-0.5 text-xs text-zinc-500">
-                Upload a <strong>.docx</strong> and we’ll turn it into chapters
-                automatically.{" "}
+                Upload a <strong>.docx</strong> and we’ll turn it into a story
+                automatically — split into chapters if you use Heading&nbsp;1s, or
+                kept as a single short story if you don’t.{" "}
                 {chapters.length === 0
                   ? "You review everything and set pricing before publishing."
                   : "Its chapters get added to what you already have."}
@@ -657,7 +698,10 @@ export function StoryForm({
                     <strong>Heading 2</strong> called “Discuss”, then one open
                     question per line — a reader’s answer becomes a public post.
                   </li>
-                  <li>No headings? It comes in as a single chapter.</li>
+                  <li>
+                    No headings? It comes in as a <strong>short story</strong> —
+                    one continuous piece, no chapters.
+                  </li>
                 </ul>
               </details>
               <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -817,14 +861,55 @@ export function StoryForm({
           {/* 3. Chapters (rich text). Visibility is the author's choice. */}
           <div className="flex flex-col gap-3">
             <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Chapters{" "}
+              {format === "single" ? "Story" : "Chapters"}{" "}
               <span className="font-normal text-zinc-500">(optional)</span>
             </span>
+
+            {/* Format: a single short story, or a story told in chapters. */}
+            <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-800 dark:bg-zinc-900/40">
+              <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                How is this story structured?
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {(
+                  [
+                    ["single", "📖 Short story", "One continuous piece"],
+                    ["chapters", "📚 Chapters", "Told in multiple parts"],
+                  ] as const
+                ).map(([value, label, hint]) => {
+                  const on = format === value;
+                  return (
+                    <button
+                      type="button"
+                      key={value}
+                      onClick={() => chooseFormat(value)}
+                      className={
+                        "flex flex-col items-start rounded-xl border px-4 py-2 text-left transition-colors " +
+                        (on
+                          ? "border-accent bg-accent/10"
+                          : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900")
+                      }
+                    >
+                      <span className="text-sm font-medium text-zinc-800 dark:text-zinc-200">
+                        {label}
+                      </span>
+                      <span className="text-xs text-zinc-500">{hint}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {format === "single" && (
+                <p className="text-xs text-zinc-500">
+                  Just write your story below — no chapters. Great for short
+                  stories and one-shots.
+                </p>
+              )}
+            </div>
 
             {/* Who can read the chapters. */}
             <fieldset className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-4 dark:border-zinc-800 dark:bg-zinc-900/40">
               <legend className="px-1 text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Who can read the chapters?
+                {format === "single" ? "Who can read this story?" : "Who can read the chapters?"}
               </legend>
               <label className="flex items-start gap-3 text-sm text-zinc-700 dark:text-zinc-300">
                 <input
@@ -929,7 +1014,9 @@ export function StoryForm({
                         </div>
                       )}
                       <span className="text-xs text-zinc-500">
-                        Set per-chapter prices on each chapter below.
+                        {format === "single"
+                          ? "This price covers the whole story."
+                          : "Set per-chapter prices on each chapter below."}
                       </span>
                     </div>
                   )}
@@ -945,19 +1032,65 @@ export function StoryForm({
                 />
                 <span>
                   <span className="font-medium">Public</span> — anyone can read
-                  the chapters straight away.
+                  {format === "single" ? " it" : " the chapters"} straight away.
                 </span>
               </label>
             </fieldset>
 
-            {chapters.length === 0 && (
+            {/* Short-story mode: one continuous body, no chapter chrome. */}
+            {format === "single" && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950">
+                <RichTextEditor
+                  value={chapters[0]?.body ?? ""}
+                  onChange={(html) => {
+                    if (chapters[0]) updateChapter(chapters[0].id, { body: html });
+                    else {
+                      setChapters([
+                        { id: newId(), title: "", body: html, prices: {}, questions: [], prompts: [] },
+                      ]);
+                    }
+                  }}
+                  placeholder="Write your story here…"
+                />
+                {(() => {
+                  const words = wordCount(htmlToText(chapters[0]?.body ?? ""));
+                  const over = words > MAX_SHORT_STORY_WORDS;
+                  return (
+                    <p className="mt-1.5 text-xs text-zinc-500">
+                      <span className={over ? "font-medium text-red-600 dark:text-red-400" : ""}>
+                        {words.toLocaleString()}/{MAX_SHORT_STORY_WORDS.toLocaleString()} words
+                      </span>
+                      {over && (
+                        <span className="text-red-600 dark:text-red-400">
+                          {" "}— trim {(words - MAX_SHORT_STORY_WORDS).toLocaleString()} to publish.
+                        </span>
+                      )}
+                    </p>
+                  );
+                })()}
+                {chapters[0] && (
+                  <>
+                    <ChapterQuestionsEditor
+                      questions={chapters[0].questions}
+                      onChange={(q) => updateChapter(chapters[0].id, { questions: q })}
+                    />
+                    <ChapterPromptsEditor
+                      prompts={chapters[0].prompts}
+                      onChange={(p) => updateChapter(chapters[0].id, { prompts: p })}
+                    />
+                  </>
+                )}
+              </div>
+            )}
+
+            {format === "chapters" && chapters.length === 0 && (
               <p className="rounded-lg border border-dashed border-zinc-300 px-4 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700">
                 No chapters yet. Add one when you&apos;re ready — you can publish
                 with just a summary and add chapters later.
               </p>
             )}
 
-            {chapters.map((chapter, i) => (
+            {format === "chapters" && chapters.map((chapter, i) => (
               <div
                 key={chapter.id}
                 className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950"
@@ -1009,19 +1142,15 @@ export function StoryForm({
                   />
                   {(() => {
                     const words = wordCount(htmlToText(chapter.body));
-                    const numPages = Math.max(
-                      1,
-                      Math.ceil(words / CHAPTER_PAGE_WORDS),
-                    );
+                    const over = words > MAX_CHAPTER_WORDS;
                     return (
                       <p className="mt-1.5 text-xs text-zinc-500">
-                        {words.toLocaleString()} word{words === 1 ? "" : "s"}
-                        {words > CHAPTER_PAGE_WORDS && (
-                          <span className="text-amber-600 dark:text-amber-400">
-                            {" "}
-                            · Long chapter — readers will turn through ~
-                            {numPages} pages (pagination starts over{" "}
-                            {CHAPTER_PAGE_WORDS.toLocaleString()} words).
+                        <span className={over ? "font-medium text-red-600 dark:text-red-400" : ""}>
+                          {words.toLocaleString()}/{MAX_CHAPTER_WORDS.toLocaleString()} words
+                        </span>
+                        {over && (
+                          <span className="text-red-600 dark:text-red-400">
+                            {" "}— trim {(words - MAX_CHAPTER_WORDS).toLocaleString()} to publish.
                           </span>
                         )}
                       </p>
@@ -1080,6 +1209,7 @@ export function StoryForm({
               </div>
             ))}
 
+            {format === "chapters" && (
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
@@ -1103,6 +1233,7 @@ export function StoryForm({
                 />
               </label>
             </div>
+            )}
           </div>
 
           {/* 4. Genres */}
