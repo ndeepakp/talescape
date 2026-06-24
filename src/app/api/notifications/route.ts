@@ -46,7 +46,7 @@ export const GET = withErrors(async () => {
     )
     INSERT INTO notifications (user_id, kind, story_id, data)
     SELECT ${me}, 'grant_expiring', e.story_id,
-           jsonb_build_object('days_left', min(e.days_left), 'discount', ${RENEWAL_DISCOUNT_PCT})
+           jsonb_build_object('days_left', min(e.days_left), 'discount', ${RENEWAL_DISCOUNT_PCT}::int)
     FROM expiring e
     GROUP BY e.story_id
   `;
