@@ -206,6 +206,10 @@ body {
   justify-content: center;
   column-gap: 26px;
   row-gap: 42px;
+  /* Extend the box one row-gap below the last row so the bottom (or only) row's
+     plank — painted at y=144 of each 186px tile — actually falls inside the box
+     and gets drawn. Without this the last shelf has no plank. */
+  padding-bottom: 42px;
   background-repeat: repeat;
   background-size: 100% 186px;
   background-image: linear-gradient(
