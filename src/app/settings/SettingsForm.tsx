@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { PushToggle } from "@/components/settings/PushToggle";
+import { ShelfPreview } from "@/components/settings/ShelfPreview";
 import {
   ACCENTS,
   BACKGROUNDS,
@@ -270,30 +271,34 @@ export function SettingsForm({
               )
             </span>
           </span>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {SHELF_STYLES.map((s) => {
-              const active = shelf === s.id;
-              return (
-                <button
-                  type="button"
-                  key={s.id}
-                  onClick={() => setShelf(s.id)}
-                  className={
-                    "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium text-zinc-900 transition-colors dark:text-zinc-100 " +
-                    (active
-                      ? "border-accent ring-1 ring-[var(--accent)]"
-                      : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900")
-                  }
-                >
-                  <span
-                    className="h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/15"
-                    style={{ background: s.swatch }}
-                    aria-hidden="true"
-                  />
-                  {s.label}
-                </button>
-              );
-            })}
+          <div className="flex items-stretch gap-3">
+            {/* Live preview of the selected finish. */}
+            <ShelfPreview shelf={shelf} />
+            <div className="grid flex-1 grid-cols-2 gap-2 self-center">
+              {SHELF_STYLES.map((s) => {
+                const active = shelf === s.id;
+                return (
+                  <button
+                    type="button"
+                    key={s.id}
+                    onClick={() => setShelf(s.id)}
+                    className={
+                      "flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium text-zinc-900 transition-colors dark:text-zinc-100 " +
+                      (active
+                        ? "border-accent ring-1 ring-[var(--accent)]"
+                        : "border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900")
+                    }
+                  >
+                    <span
+                      className="h-4 w-4 shrink-0 rounded-full border border-black/10 dark:border-white/15"
+                      style={{ background: s.swatch }}
+                      aria-hidden="true"
+                    />
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
