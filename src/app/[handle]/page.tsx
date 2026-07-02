@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { sql } from "@/lib/db";
@@ -15,6 +16,33 @@ import { CURRENCY } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 
+// Public SEO + social metadata for author profiles.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ handle: string }>;
+}): Promise<Metadata> {
+  const { handle } = await params;
+  const [u] = await sql<
+    { name: string | null; username: string | null; bio: string | null; image: string | null }[]
+  >`SELECT name, username, bio, image FROM "user" WHERE lower(username) = lower(${handle})`;
+  if (!u) return { title: "Profile · Talerooms" };
+  const display = u.name ?? (u.username ? `@${u.username}` : "A writer");
+  const description = (u.bio || `${display} on Talerooms.`).slice(0, 200);
+  const images = u.image ? [{ url: u.image }] : undefined;
+  return {
+    title: `${display} (@${u.username ?? handle}) · Talerooms`,
+    description,
+    openGraph: { title: display, description, type: "profile", images },
+    twitter: {
+      card: u.image ? "summary" : "summary",
+      title: display,
+      description,
+      images: u.image ? [u.image] : undefined,
+    },
+  };
+}
+
 export default async function ProfilePage({
   params,
 }: {
@@ -22,8 +50,9 @@ export default async function ProfilePage({
 }) {
   const { handle } = await params;
 
+  // Session is optional — profiles are public (indexable + shareable).
   const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) redirect("/login");
+  const userId = session?.user.id ?? null;
 
   const [user] = await sql<
     {
@@ -43,18 +72,18 @@ export default async function ProfilePage({
 
   const id = user.id;
   const h = user.username ?? handle;
-  const isSelf = session.user.id === id;
+  const isSelf = userId === id;
 
   // The viewer's active subscription to this author (days remaining + whether
   // they've cancelled future renewal), if any.
   let subDaysLeft: number | null = null;
   let subCancelled = false;
-  if (!isSelf && user.subscription_price) {
+  if (!isSelf && user.subscription_price && userId) {
     const [row] = await sql<{ days: number; cancelled: boolean }[]>`
       SELECT CEIL(EXTRACT(EPOCH FROM (expires_at - now())) / 86400)::int AS days,
              cancelled
       FROM subscriptions
-      WHERE subscriber_id = ${session.user.id} AND author_id = ${id}
+      WHERE subscriber_id = ${userId} AND author_id = ${id}
         AND expires_at > now()
     `;
     subDaysLeft = row?.days ?? null;
@@ -103,15 +132,16 @@ export default async function ProfilePage({
     : [];
 
   let isFollowing = false;
-  if (session && !isSelf) {
+  if (userId && !isSelf) {
     const [row] = await sql<{ one: number }[]>`
-      SELECT 1 AS one FROM follows WHERE follower_id = ${session.user.id} AND following_id = ${id}
+      SELECT 1 AS one FROM follows WHERE follower_id = ${userId} AND following_id = ${id}
     `;
     isFollowing = !!row;
   }
 
-  // This user's community posts.
-  const posts = await getPosts({ viewerId: session.user.id, authorId: id });
+  // This user's community posts. An empty viewer id leaves the per-viewer flags
+  // (liked/mine) false for logged-out visitors.
+  const posts = await getPosts({ viewerId: userId ?? "", authorId: id });
 
   return (
     <div className="min-h-screen bg-[var(--page)] px-6 py-12">
@@ -184,7 +214,7 @@ export default async function ProfilePage({
                 initialFollowing={isFollowing}
                 isLoggedIn={!!session}
               />
-              {user.subscription_price ? (
+              {session && user.subscription_price ? (
                 <SubscribeButton
                   authorId={user.id}
                   price={user.subscription_price}
@@ -292,7 +322,7 @@ export default async function ProfilePage({
           />
         </div>
 
-        {!isSelf && (
+        {session && !isSelf && (
           <div className="mt-12 flex flex-col items-start gap-2 border-t border-zinc-200 pt-6 dark:border-zinc-800">
             <ReportButton userId={user.id} />
           </div>

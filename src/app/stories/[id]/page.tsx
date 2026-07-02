@@ -70,17 +70,12 @@ export async function generateMetadata({
     return { title: "Talerooms", robots: { index: false, follow: false } };
   }
   const description = (s.summary || "A story on Talerooms.").slice(0, 200);
-  const images = s.cover_url ? [{ url: s.cover_url }] : undefined;
+  // The og:image + twitter image come from opengraph-image.tsx (generated card).
   return {
     title: `${s.title} · Talerooms`,
     description,
-    openGraph: { title: s.title, description, type: "article", images },
-    twitter: {
-      card: s.cover_url ? "summary_large_image" : "summary",
-      title: s.title,
-      description,
-      images: s.cover_url ? [s.cover_url] : undefined,
-    },
+    openGraph: { title: s.title, description, type: "article" },
+    twitter: { card: "summary_large_image", title: s.title, description },
   };
 }
 
